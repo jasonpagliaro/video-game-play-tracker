@@ -1,36 +1,66 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Steam Backlog Tracker
 
-## Getting Started
+A personal Steam backlog execution tool built with Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Supabase Auth, Supabase Postgres, and Drizzle.
 
-First, run the development server:
+Phase 1 includes CSV import, backlog views, status transitions, active rotation limits, replacement workflow, queue ranking, category-aware queue insertion, settings, and core tests. Steam API sync, check-ins, milestones, drag-and-drop queue, and scheduled sync are intentionally deferred to later phases.
+
+## Setup
+
+1. Copy `.env.example` to `.env.local`.
+2. Create a Supabase project and fill:
+   - `DATABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `APP_ALLOWED_EMAILS`
+3. Apply the initial SQL migration in `src/db/migrations/0000_initial.sql` through Supabase SQL editor or `npm run db:migrate`.
+4. Run the app:
+
+```bash
+npm install
+npm run dev
+```
+
+Without Supabase env vars, local development renders with a placeholder user and empty data so the UI can be inspected.
+
+## Scripts
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm test
+npm run build
+npm run db:generate
+npm run db:migrate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Phase 1 Routes
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- `/` dashboard
+- `/rotation`
+- `/backlog`
+- `/queue`
+- `/completed`
+- `/dnf`
+- `/parking-lot`
+- `/import`
+- `/settings`
+- `/games/[id]`
+- `/login`
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## CSV Import
 
-## Learn More
+The importer supports flexible column names and maps the discovered Steam export shape:
 
-To learn more about Next.js, take a look at the following resources:
+- `game` -> title
+- `id` -> Steam app id
+- `hours` -> playtime minutes
+- `last_played`
+- `release_date` -> release year
+- review score columns into Steam review metadata
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Imports upsert by Steam app id when present, otherwise normalized title. Manual status, notes, DNF decisions, queue position, and manually edited slot/type decisions are preserved on update.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
+Deploy on Vercel with the same env vars from `.env.example`. Configure Supabase Auth redirect URLs for the production domain and preview URLs. Run migrations before promoting a production deployment.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
