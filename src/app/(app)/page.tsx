@@ -33,27 +33,27 @@ export default async function DashboardPage() {
       />
       <DashboardStatusGrid summary={summary} settings={settings} />
       <WarningPanel warnings={summary.warnings} />
+      <DashboardSection
+        title="Current active rotation"
+        href="/rotation"
+        empty="No active games in rotation."
+        cardGridClassName="md:grid-cols-2 xl:grid-cols-3"
+      >
+        {summary.activeGames.map((game, index) => (
+          <DashboardGameCard key={game.id} game={game} priorityImage={index < 2} />
+        ))}
+      </DashboardSection>
       <DashboardQueueStatus summary={summary} />
-      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-        <DashboardSection
-          title="Current active rotation"
-          href="/rotation"
-          empty="No active games in rotation."
-        >
-          {summary.activeGames.map((game, index) => (
-            <DashboardGameCard key={game.id} game={game} priorityImage={index < 2} />
-          ))}
-        </DashboardSection>
-        <DashboardSection
-          title="Next up"
-          href="/queue"
-          empty="No queued games yet."
-        >
-          {summary.nextWindowGames.map((game, index) => (
-            <DashboardGameCard key={game.id} game={game} queuePosition={index + 1} priorityImage={index < 2} />
-          ))}
-        </DashboardSection>
-      </div>
+      <DashboardSection
+        title="Next up"
+        href="/queue"
+        empty="No queued games yet."
+        cardGridClassName="md:grid-cols-2 xl:grid-cols-4"
+      >
+        {summary.nextWindowGames.map((game, index) => (
+          <DashboardGameCard key={game.id} game={game} queuePosition={index + 1} priorityImage={index < 2} />
+        ))}
+      </DashboardSection>
     </div>
   );
 }
@@ -63,11 +63,13 @@ function DashboardSection({
   href,
   empty,
   children,
+  cardGridClassName = "md:grid-cols-2",
 }: {
   title: string;
   href: string;
   empty: string;
   children: ReactNode;
+  cardGridClassName?: string;
 }) {
   return (
     <section className="grid gap-3">
@@ -80,7 +82,7 @@ function DashboardSection({
           </Link>
         </Button>
       </div>
-      <div className="grid gap-3 md:grid-cols-2">
+      <div className={`grid gap-3 ${cardGridClassName}`}>
         {children}
       </div>
       {Array.isArray(children) && children.length === 0 ? (
