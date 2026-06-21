@@ -1,24 +1,37 @@
-import { Button } from "@/components/ui/button";
+"use client";
+
+import { useRouter } from "next/navigation";
+
+import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
+import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import type { AutoSaveSettingsFieldInput } from "@/lib/backlog/autosave";
 import type { AppSettings } from "@/lib/backlog/types";
-import { updateSettingsAction } from "@/server/actions/settings-actions";
+import { autoSaveSettingsFieldAction } from "@/server/actions/settings-actions";
+
+type NumberSettingField = Extract<AutoSaveSettingsFieldInput, { value: string }>["field"];
+type BooleanSettingField = Extract<AutoSaveSettingsFieldInput, { value: boolean }>["field"];
 
 export function SettingsForm({ settings }: { settings: AppSettings }) {
   return (
-    <form action={updateSettingsAction} className="grid gap-4">
+    <div className="grid gap-4">
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Rotation and install rules</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-2">
-          <NumberField name="maxActiveRotationCount" label="Max active rotation" defaultValue={settings.maxActiveRotationCount} min={1} />
-          <NumberField name="maxInstalledCount" label="Max installed warning count" defaultValue={settings.maxInstalledCount ?? ""} min={1} />
-          <NumberField name="checkinIntervalDays" label="Check-in interval days" defaultValue={settings.checkinIntervalDays} min={1} />
-          <NumberField name="checkinIntervalHoursPlayed" label="Check-in interval hours played" defaultValue={settings.checkinIntervalHoursPlayed} min={1} />
+          <NumberField name="maxActiveRotationCount" label="Max active rotation" defaultValue={settings.maxActiveRotationCount} />
+          <NumberField name="maxInstalledCount" label="Max installed warning count" defaultValue={settings.maxInstalledCount ?? ""} />
+          <NumberField name="checkinIntervalDays" label="Check-in interval days" defaultValue={settings.checkinIntervalDays} />
+          <NumberField
+            name="checkinIntervalHoursPlayed"
+            label="Check-in interval hours played"
+            defaultValue={settings.checkinIntervalHoursPlayed}
+          />
         </CardContent>
       </Card>
       <Card>
@@ -42,7 +55,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
           <CardTitle className="text-base">Import and queue balancing</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <NumberField name="queueSlidingWindowSize" label="Queue sliding window size" defaultValue={settings.queueSlidingWindowSize} min={3} />
+          <NumberField name="queueSlidingWindowSize" label="Queue sliding window size" defaultValue={settings.queueSlidingWindowSize} />
           <Separator />
           <BooleanField name="autoQueueNewImports" label="Auto-queue new imports by default" checked={settings.autoQueueNewImports} />
           <BooleanField
@@ -52,10 +65,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
           />
         </CardContent>
       </Card>
-      <div className="flex justify-end">
-        <Button type="submit">Save settings</Button>
-      </div>
-    </form>
+    </div>
   );
 }
 
@@ -63,27 +73,51 @@ function NumberField({
   name,
   label,
   defaultValue,
-  min,
 }: {
-  name: string;
+  name: NumberSettingField;
   label: string;
   defaultValue: number | string;
-  min?: number;
 }) {
+  const router = useRouter();
+  const field = useAutoSaveField<string, { field: AutoSaveSettingsFieldInput["field"] }>({
+    initialValue: String(defaultValue),
+    save: (value) => autoSaveSettingsFieldAction({ field: name, value }),
+    onSaved: () => router.refresh(),
+  });
+
   return (
     <div className="grid gap-2">
-      <Label htmlFor={name}>{label}</Label>
-      <Input id={name} name={name} type="number" min={min} defaultValue={defaultValue} />
+      <div className="flex items-center justify-between gap-2">
+        <Label htmlFor={name}>{label}</Label>
+        <AutoSaveStatus status={field.status} message={field.message} />
+      </div>
+      <Input
+        id={name}
+        value={field.value}
+        type="number"
+        onChange={(event) => field.setAndScheduleSave(event.target.value)}
+        onBlur={field.flush}
+      />
     </div>
   );
 }
 
-function BooleanField({ name, label, checked }: { name: string; label: string; checked: boolean }) {
+function BooleanField({ name, label, checked }: { name: BooleanSettingField; label: string; checked: boolean }) {
+  const router = useRouter();
+  const field = useAutoSaveField<boolean, { field: AutoSaveSettingsFieldInput["field"] }>({
+    initialValue: checked,
+    save: (value) => autoSaveSettingsFieldAction({ field: name, value }),
+    serialize: (value) => String(value),
+    onSaved: () => router.refresh(),
+  });
+
   return (
-    <label className="flex items-center gap-3 rounded-md border border-border p-3 text-sm">
-      <Checkbox name={name} defaultChecked={checked} />
-      <span>{label}</span>
+    <label className="flex items-center justify-between gap-3 rounded-md border border-border p-3 text-sm">
+      <span className="flex items-center gap-3">
+        <Checkbox checked={field.value} onCheckedChange={(value) => field.setAndSave(value === true)} />
+        <span>{label}</span>
+      </span>
+      <AutoSaveStatus status={field.status} message={field.message} />
     </label>
   );
 }
-

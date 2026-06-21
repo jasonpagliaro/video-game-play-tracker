@@ -1,7 +1,8 @@
 "use client";
 
+import { Fragment, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   type ColumnDef,
   flexRender,
@@ -10,8 +11,10 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, Check, MoreHorizontal, RotateCw } from "lucide-react";
+import { ArrowDown, ArrowUp, MoreHorizontal, RotateCw, X } from "lucide-react";
 
+import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
+import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
 import {
   CompletionTypeBadge,
   InterestBadge,
@@ -19,15 +22,9 @@ import {
   StatusBadge,
   SyncStateBadge,
 } from "@/components/badges/game-badges";
+import { StatusResolutionDialog, type StatusResolutionIntent } from "@/components/backlog/status-resolution-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -43,42 +40,65 @@ import {
   COMPLETION_TYPE_LABELS,
   type GameStatus,
 } from "@/lib/backlog/constants";
+import {
+  gameIsVisibleInTable,
+  getDefaultVisibilityScope,
+  getGameDestination,
+  ghostReasonForGame,
+  isGameStatus,
+  parseQueueRank,
+  type GameTableFilters,
+  type GameTableView,
+  type GameVisibilityScope,
+  type GameVisibilitySnapshot,
+} from "@/lib/backlog/autosave";
 import { formatDate, formatMinutes, formatPercent } from "@/lib/backlog/format";
 import type { AppSettings, GameSummary } from "@/lib/backlog/types";
 import {
+  autoSaveGameFieldAction,
   moveQueueItemAction,
   rebalanceQueueAction,
-  toggleCurrentRotationAction,
-  toggleInstalledAction,
   bulkUpdateGamesAction,
-  updateGameFieldsAction,
-  updateGameStatusAction,
 } from "@/server/actions/game-actions";
 
-type ReplacementIntent =
-  | { kind: "rotation"; game: GameSummary }
-  | { kind: "status"; game: GameSummary; status: GameStatus }
-  | null;
+type GhostEntry = {
+  id: string;
+  title: string;
+  sourceIndex: number;
+  reason: string;
+  detailHref: string;
+  destinationHref: string;
+  destinationLabel: string;
+};
 
 export function GameTable({
   games,
   settings,
   view = "all",
   showQueueControls = false,
+  visibilityScope,
 }: {
   games: GameSummary[];
   settings: AppSettings;
-  view?: "all" | "queue" | "rotation" | "completed" | "dnf" | "ongoing";
+  view?: GameTableView;
   showQueueControls?: boolean;
+  visibilityScope?: GameVisibilityScope;
 }) {
+  const router = useRouter();
   const [globalFilter, setGlobalFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [slotFilter, setSlotFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [replacementIntent, setReplacementIntent] = useState<ReplacementIntent>(null);
+  const [resolutionIntent, setResolutionIntent] = useState<StatusResolutionIntent>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [ghosts, setGhosts] = useState<GhostEntry[]>([]);
   const activeGames = games.filter((game) => game.currentRotation);
   const activeFull = activeGames.length >= settings.maxActiveRotationCount;
+  const resolvedVisibilityScope = visibilityScope ?? getDefaultVisibilityScope(view, games);
+  const filters = useMemo<GameTableFilters>(
+    () => ({ statusFilter, slotFilter, typeFilter }),
+    [slotFilter, statusFilter, typeFilter],
+  );
 
   const filteredData = useMemo(
     () =>
@@ -89,6 +109,30 @@ export function GameTable({
         return true;
       }),
     [games, slotFilter, statusFilter, typeFilter],
+  );
+
+  const handleSaved = useCallback(
+    (game: Pick<GameSummary, "id" | "title">, sourceIndex: number | undefined, snapshot: GameVisibilitySnapshot) => {
+      if (gameIsVisibleInTable(snapshot, resolvedVisibilityScope, filters)) {
+        setGhosts((current) => current.filter((ghost) => ghost.id !== snapshot.id));
+      } else {
+        const destination = getGameDestination(snapshot);
+        setGhosts((current) => [
+          ...current.filter((ghost) => ghost.id !== snapshot.id),
+          {
+            id: snapshot.id,
+            title: game.title,
+            sourceIndex: sourceIndex ?? 0,
+            reason: ghostReasonForGame(snapshot),
+            detailHref: snapshot.detailHref,
+            destinationHref: destination.href,
+            destinationLabel: destination.label,
+          },
+        ]);
+      }
+      router.refresh();
+    },
+    [filters, resolvedVisibilityScope, router],
   );
 
   const columns = useMemo<ColumnDef<GameSummary>[]>(
@@ -127,24 +171,15 @@ export function GameTable({
         accessorKey: "status",
         header: "Status",
         cell: ({ row }) => (
-          <form action={updateGameStatusAction} className="flex min-w-44 items-center gap-2">
-            <input type="hidden" name="gameId" value={row.original.id} />
-            <Select name="status" defaultValue={row.original.status}>
-              <SelectTrigger className="h-8 w-36">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {GAME_STATUSES.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {STATUS_LABELS[status]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button size="icon" variant="ghost" className="h-8 w-8" title="Save status">
-              <Check className="h-4 w-4" />
-            </Button>
-          </form>
+          <GameStatusAutoSelect
+            key={`${row.original.id}-status-${row.original.status}`}
+            game={row.original}
+            settings={settings}
+            activeFull={activeFull}
+            sourceIndex={row.index}
+            onResolutionNeeded={setResolutionIntent}
+            onSaved={handleSaved}
+          />
         ),
       },
       {
@@ -162,32 +197,23 @@ export function GameTable({
         id: "flags",
         header: "Install / Active",
         cell: ({ row }) => (
-          <div className="flex min-w-36 gap-2">
-            <form action={toggleInstalledAction}>
-              <input type="hidden" name="gameId" value={row.original.id} />
-              <input type="hidden" name="installed" value={String(!row.original.installed)} />
-              <Button size="sm" variant={row.original.installed ? "default" : "outline"} className="h-8">
-                Installed
-              </Button>
-            </form>
-            {row.original.currentRotation || !activeFull ? (
-              <form action={toggleCurrentRotationAction}>
-                <input type="hidden" name="gameId" value={row.original.id} />
-                <input type="hidden" name="currentRotation" value={String(!row.original.currentRotation)} />
-                <Button size="sm" variant={row.original.currentRotation ? "default" : "outline"} className="h-8">
-                  Active
-                </Button>
-              </form>
-            ) : (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-8"
-                onClick={() => setReplacementIntent({ kind: "rotation", game: row.original })}
-              >
-                Active
-              </Button>
-            )}
+          <div className="flex min-w-44 flex-col gap-1">
+            <div className="flex gap-2">
+              <InstalledToggle
+                key={`${row.original.id}-installed-${row.original.installed}`}
+                game={row.original}
+                sourceIndex={row.index}
+                onSaved={handleSaved}
+              />
+              <RotationToggle
+                key={`${row.original.id}-rotation-${row.original.currentRotation}`}
+                game={row.original}
+                activeFull={activeFull}
+                sourceIndex={row.index}
+                onResolutionNeeded={setResolutionIntent}
+                onSaved={handleSaved}
+              />
+            </div>
           </div>
         ),
       },
@@ -195,18 +221,12 @@ export function GameTable({
         accessorKey: "queueRank",
         header: "Queue",
         cell: ({ row }) => (
-          <form action={updateGameFieldsAction} className="flex min-w-32 items-center gap-1">
-            <input type="hidden" name="gameId" value={row.original.id} />
-            <Input
-              name="queueRank"
-              defaultValue={row.original.queueRank ?? ""}
-              className="h-8 w-20 font-mono text-xs"
-              inputMode="numeric"
-            />
-            <Button size="icon" variant="ghost" className="h-8 w-8" title="Save queue rank">
-              <Check className="h-4 w-4" />
-            </Button>
-          </form>
+          <QueueRankAutoInput
+            key={`${row.original.id}-queue-${row.original.queueRank ?? "none"}`}
+            game={row.original}
+            sourceIndex={row.index}
+            onSaved={handleSaved}
+          />
         ),
       },
       {
@@ -255,10 +275,23 @@ export function GameTable({
               <DropdownMenuItem asChild>
                 <Link href={`/games/${row.original.id}`}>Open detail</Link>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setReplacementIntent({ kind: "status", game: row.original, status: "in_progress" })}>
+              <DropdownMenuItem
+                onClick={() =>
+                  setResolutionIntent({
+                    kind: "status",
+                    game: row.original,
+                    status: "in_progress",
+                    sourceIndex: row.index,
+                  })
+                }
+              >
                 Start with replacement
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setReplacementIntent({ kind: "status", game: row.original, status: "dnf" })}>
+              <DropdownMenuItem
+                onClick={() =>
+                  setResolutionIntent({ kind: "status", game: row.original, status: "dnf", sourceIndex: row.index })
+                }
+              >
                 DNF with reason
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -266,7 +299,7 @@ export function GameTable({
         ),
       },
     ],
-    [activeFull, selectedIds],
+    [activeFull, handleSaved, selectedIds, settings],
   );
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -279,6 +312,11 @@ export function GameTable({
     getFilteredRowModel: getFilteredRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
+
+  const visibleRows = table.getRowModel().rows;
+  const tableColSpan = columns.length + (view === "queue" ? 1 : 0);
+  const ghostsForIndex = (index: number) =>
+    ghosts.filter((ghost) => (index === visibleRows.length ? ghost.sourceIndex >= index : ghost.sourceIndex === index));
 
   return (
     <div className="grid gap-3">
@@ -305,10 +343,10 @@ export function GameTable({
           </Select>
           <Select value={slotFilter} onValueChange={setSlotFilter}>
             <SelectTrigger className="h-9 w-48">
-              <SelectValue placeholder="Category" />
+              <SelectValue placeholder="Slot" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
+              <SelectItem value="all">All slots</SelectItem>
               {BACKLOG_SLOTS.map((slot) => (
                 <SelectItem key={slot} value={slot}>
                   {SLOT_LABELS[slot]}
@@ -318,10 +356,10 @@ export function GameTable({
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="h-9 w-44">
-              <SelectValue placeholder="Finish style" />
+              <SelectValue placeholder="Type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All finish styles</SelectItem>
+              <SelectItem value="all">All types</SelectItem>
               {COMPLETION_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   {COMPLETION_TYPE_LABELS[type]}
@@ -351,8 +389,8 @@ export function GameTable({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="set_status">Set status</SelectItem>
-              <SelectItem value="set_slot">Set category</SelectItem>
-              <SelectItem value="set_completion_type">Set finish style</SelectItem>
+              <SelectItem value="set_slot">Set slot</SelectItem>
+              <SelectItem value="set_completion_type">Set type</SelectItem>
               <SelectItem value="set_interest">Set interest</SelectItem>
               <SelectItem value="park">Park selected</SelectItem>
               <SelectItem value="wont_complete">Won&apos;t Complete</SelectItem>
@@ -360,7 +398,6 @@ export function GameTable({
               <SelectItem value="remove_rotation">Remove active</SelectItem>
               <SelectItem value="mark_ignored">Mark ignored</SelectItem>
               <SelectItem value="recalculate_priority">Recalc priority</SelectItem>
-              <SelectItem value="reclassify">Reclassify selected</SelectItem>
               <SelectItem value="rebalance_selected">Rebalance selected</SelectItem>
             </SelectContent>
           </Select>
@@ -439,41 +476,61 @@ export function GameTable({
               ))}
             </TableHeader>
             <TableBody>
-              {table.getRowModel().rows.length ? (
-                table.getRowModel().rows.map((row) => (
-                  <TableRow key={row.id}>
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id} className="py-2 align-top text-xs">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
-                    ))}
-                    {view === "queue" ? (
-                      <TableCell className="py-2 align-top">
-                        <div className="flex gap-1">
-                          <form action={moveQueueItemAction}>
-                            <input type="hidden" name="gameId" value={row.original.id} />
-                            <input type="hidden" name="direction" value="up" />
-                            <input type="hidden" name="currentRank" value={row.original.queueRank ?? 1000} />
-                            <Button size="icon" variant="ghost" className="h-8 w-8">
-                              <ArrowUp className="h-4 w-4" />
-                            </Button>
-                          </form>
-                          <form action={moveQueueItemAction}>
-                            <input type="hidden" name="gameId" value={row.original.id} />
-                            <input type="hidden" name="direction" value="down" />
-                            <input type="hidden" name="currentRank" value={row.original.queueRank ?? 1000} />
-                            <Button size="icon" variant="ghost" className="h-8 w-8">
-                              <ArrowDown className="h-4 w-4" />
-                            </Button>
-                          </form>
-                        </div>
-                      </TableCell>
-                    ) : null}
-                  </TableRow>
-                ))
+              {visibleRows.length || ghosts.length ? (
+                <>
+                  {visibleRows.map((row, index) => (
+                    <Fragment key={row.id}>
+                      {ghostsForIndex(index).map((ghost) => (
+                        <GhostTableRow
+                          key={ghost.id}
+                          ghost={ghost}
+                          colSpan={tableColSpan}
+                          onDismiss={() => setGhosts((current) => current.filter((entry) => entry.id !== ghost.id))}
+                        />
+                      ))}
+                      <TableRow>
+                        {row.getVisibleCells().map((cell) => (
+                          <TableCell key={cell.id} className="py-2 align-top text-xs">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </TableCell>
+                        ))}
+                        {view === "queue" ? (
+                          <TableCell className="py-2 align-top">
+                            <div className="flex gap-1">
+                              <form action={moveQueueItemAction}>
+                                <input type="hidden" name="gameId" value={row.original.id} />
+                                <input type="hidden" name="direction" value="up" />
+                                <input type="hidden" name="currentRank" value={row.original.queueRank ?? 1000} />
+                                <Button size="icon" variant="ghost" className="h-8 w-8">
+                                  <ArrowUp className="h-4 w-4" />
+                                </Button>
+                              </form>
+                              <form action={moveQueueItemAction}>
+                                <input type="hidden" name="gameId" value={row.original.id} />
+                                <input type="hidden" name="direction" value="down" />
+                                <input type="hidden" name="currentRank" value={row.original.queueRank ?? 1000} />
+                                <Button size="icon" variant="ghost" className="h-8 w-8">
+                                  <ArrowDown className="h-4 w-4" />
+                                </Button>
+                              </form>
+                            </div>
+                          </TableCell>
+                        ) : null}
+                      </TableRow>
+                    </Fragment>
+                  ))}
+                  {ghostsForIndex(visibleRows.length).map((ghost) => (
+                    <GhostTableRow
+                      key={ghost.id}
+                      ghost={ghost}
+                      colSpan={tableColSpan}
+                      onDismiss={() => setGhosts((current) => current.filter((entry) => entry.id !== ghost.id))}
+                    />
+                  ))}
+                </>
               ) : (
                 <TableRow>
-                  <TableCell colSpan={columns.length + 1} className="h-28 text-center text-muted-foreground">
+                  <TableCell colSpan={tableColSpan} className="h-28 text-center text-muted-foreground">
                     No games match this view.
                   </TableCell>
                 </TableRow>
@@ -483,76 +540,209 @@ export function GameTable({
         </div>
       </div>
 
-      <ReplacementDialog
-        intent={replacementIntent}
+      <StatusResolutionDialog
+        intent={resolutionIntent}
         activeGames={activeGames}
         onOpenChange={(open) => {
-          if (!open) setReplacementIntent(null);
+          if (!open) setResolutionIntent(null);
         }}
+        onSaved={(intent, snapshot) => handleSaved(intent.game, intent.sourceIndex, snapshot)}
       />
     </div>
   );
 }
 
-function ReplacementDialog({
-  intent,
-  activeGames,
-  onOpenChange,
+function GameStatusAutoSelect({
+  game,
+  settings,
+  activeFull,
+  sourceIndex,
+  onResolutionNeeded,
+  onSaved,
 }: {
-  intent: ReplacementIntent;
-  activeGames: GameSummary[];
-  onOpenChange: (open: boolean) => void;
+  game: GameSummary;
+  settings: AppSettings;
+  activeFull: boolean;
+  sourceIndex: number;
+  onResolutionNeeded: (intent: StatusResolutionIntent) => void;
+  onSaved: (game: Pick<GameSummary, "id" | "title">, sourceIndex: number, snapshot: GameVisibilitySnapshot) => void;
 }) {
-  const [replacementId, setReplacementId] = useState(activeGames[0]?.id ?? "");
-  const [dnfReason, setDnfReason] = useState("");
-  const open = Boolean(intent);
+  const field = useAutoSaveField<GameStatus, GameVisibilitySnapshot>({
+    initialValue: game.status,
+    save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "status", value }),
+    onSaved: (snapshot) => onSaved(game, sourceIndex, snapshot),
+  });
+
+  function handleChange(value: string) {
+    if (!isGameStatus(value)) return;
+    if (value === "dnf") {
+      onResolutionNeeded({ kind: "status", game, status: value, sourceIndex });
+      return;
+    }
+    if (
+      value === "in_progress" &&
+      !game.currentRotation &&
+      settings.inProgressAddsToRotationWhenSpace &&
+      activeFull
+    ) {
+      onResolutionNeeded({ kind: "status", game, status: value, sourceIndex });
+      return;
+    }
+    field.setAndSave(value);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Choose a rotation replacement</DialogTitle>
-          <DialogDescription>
-            The active limit is full. Pick the active game that leaves rotation; nothing is removed silently.
-          </DialogDescription>
-        </DialogHeader>
-        {intent ? (
-          <form action={intent.kind === "rotation" ? toggleCurrentRotationAction : updateGameStatusAction} className="grid gap-4">
-            <input type="hidden" name="gameId" value={intent.game.id} />
-            <input type="hidden" name="replacementGameId" value={replacementId} />
-            {intent.kind === "rotation" ? (
-              <input type="hidden" name="currentRotation" value="true" />
-            ) : (
-              <input type="hidden" name="status" value={intent.status} />
-            )}
-            {intent.kind === "status" && intent.status === "dnf" ? (
-              <Input
-                name="dnfReason"
-                value={dnfReason}
-                onChange={(event) => setDnfReason(event.target.value)}
-                placeholder="DNF reason"
-              />
-            ) : null}
-            <Select value={replacementId} onValueChange={setReplacementId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Active game to remove" />
-              </SelectTrigger>
-              <SelectContent>
-                {activeGames.map((game) => (
-                  <SelectItem key={game.id} value={game.id}>
-                    {game.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Apply replacement</Button>
-            </div>
-          </form>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+    <div className="grid min-w-44 gap-1">
+      <Select value={field.value} onValueChange={handleChange}>
+        <SelectTrigger className="h-8 w-36">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {GAME_STATUSES.map((status) => (
+            <SelectItem key={status} value={status}>
+              {STATUS_LABELS[status]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <AutoSaveStatus status={field.status} message={field.message} />
+    </div>
+  );
+}
+
+function QueueRankAutoInput({
+  game,
+  sourceIndex,
+  onSaved,
+}: {
+  game: GameSummary;
+  sourceIndex: number;
+  onSaved: (game: Pick<GameSummary, "id" | "title">, sourceIndex: number, snapshot: GameVisibilitySnapshot) => void;
+}) {
+  const field = useAutoSaveField<string, GameVisibilitySnapshot>({
+    initialValue: game.queueRank?.toString() ?? "",
+    save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "queueRank", value }),
+    validate: (value) => {
+      const parsed = parseQueueRank(value);
+      return parsed.ok ? null : parsed.message;
+    },
+    onSaved: (snapshot) => onSaved(game, sourceIndex, snapshot),
+  });
+
+  return (
+    <div className="grid min-w-32 gap-1">
+      <Input
+        value={field.value}
+        onChange={(event) => field.setAndScheduleSave(event.target.value)}
+        onBlur={field.flush}
+        className="h-8 w-20 font-mono text-xs"
+        inputMode="numeric"
+      />
+      <AutoSaveStatus status={field.status} message={field.message} />
+    </div>
+  );
+}
+
+function InstalledToggle({
+  game,
+  sourceIndex,
+  onSaved,
+}: {
+  game: GameSummary;
+  sourceIndex: number;
+  onSaved: (game: Pick<GameSummary, "id" | "title">, sourceIndex: number, snapshot: GameVisibilitySnapshot) => void;
+}) {
+  const field = useAutoSaveField<boolean, GameVisibilitySnapshot>({
+    initialValue: game.installed,
+    save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "installed", value }),
+    serialize: (value) => String(value),
+    onSaved: (snapshot) => onSaved(game, sourceIndex, snapshot),
+  });
+
+  return (
+    <div className="grid gap-1">
+      <Button
+        type="button"
+        size="sm"
+        variant={field.value ? "default" : "outline"}
+        className="h-8"
+        onClick={() => field.setAndSave(!field.value)}
+      >
+        Installed
+      </Button>
+      <AutoSaveStatus status={field.status} message={field.message} />
+    </div>
+  );
+}
+
+function RotationToggle({
+  game,
+  activeFull,
+  sourceIndex,
+  onResolutionNeeded,
+  onSaved,
+}: {
+  game: GameSummary;
+  activeFull: boolean;
+  sourceIndex: number;
+  onResolutionNeeded: (intent: StatusResolutionIntent) => void;
+  onSaved: (game: Pick<GameSummary, "id" | "title">, sourceIndex: number, snapshot: GameVisibilitySnapshot) => void;
+}) {
+  const field = useAutoSaveField<boolean, GameVisibilitySnapshot>({
+    initialValue: game.currentRotation,
+    save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "currentRotation", value }),
+    serialize: (value) => String(value),
+    onSaved: (snapshot) => onSaved(game, sourceIndex, snapshot),
+  });
+
+  function handleClick() {
+    if (!field.value && activeFull) {
+      onResolutionNeeded({ kind: "rotation", game, sourceIndex });
+      return;
+    }
+    field.setAndSave(!field.value);
+  }
+
+  return (
+    <div className="grid gap-1">
+      <Button type="button" size="sm" variant={field.value ? "default" : "outline"} className="h-8" onClick={handleClick}>
+        Active
+      </Button>
+      <AutoSaveStatus status={field.status} message={field.message} />
+    </div>
+  );
+}
+
+function GhostTableRow({
+  ghost,
+  colSpan,
+  onDismiss,
+}: {
+  ghost: GhostEntry;
+  colSpan: number;
+  onDismiss: () => void;
+}) {
+  return (
+    <TableRow className="bg-muted/40">
+      <TableCell colSpan={colSpan} className="py-3 text-xs text-muted-foreground">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <span className="font-medium text-foreground">{ghost.title}</span>{" "}
+            <span>{ghost.reason}</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <Link href={ghost.detailHref} className="font-medium text-foreground underline-offset-4 hover:underline">
+              Open detail
+            </Link>
+            <Link href={ghost.destinationHref} className="underline-offset-4 hover:underline">
+              {ghost.destinationLabel}
+            </Link>
+            <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={onDismiss}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }

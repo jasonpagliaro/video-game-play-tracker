@@ -29,6 +29,7 @@ import { parseSteamCsv } from "@/lib/backlog/csv";
 import { calculatePriorityScore, inferBacklogSlot, inferCompletionType } from "@/lib/backlog/inference";
 import { normalizeTitle } from "@/lib/backlog/normalize";
 import { transitionGameStatus } from "@/lib/backlog/status";
+import type { GameVisibilitySnapshot } from "@/lib/backlog/autosave";
 import type { AppSettings, Game, GameSummary, ParsedCsvGame, QueueCandidate } from "@/lib/backlog/types";
 import { isDatabaseConfigured } from "@/lib/env";
 import { fetchSteamStoreMetadataForAppIds } from "@/lib/steam/client";
@@ -123,6 +124,16 @@ export async function getGame(user: AppUser, id: string): Promise<Game | null> {
       where: and(eq(games.userId, user.id), eq(games.id, id)),
     });
     return row ? mapGame(row) : null;
+  });
+}
+
+export async function getGameVisibilitySnapshot(user: AppUser, id: string): Promise<GameVisibilitySnapshot | null> {
+  if (!isDatabaseConfigured()) return null;
+  return withUserDb(user, async (tx) => {
+    const row = await tx.query.games.findFirst({
+      where: and(eq(games.userId, user.id), eq(games.id, id)),
+    });
+    return row ? mapGameVisibilitySnapshot(row) : null;
   });
 }
 
@@ -223,6 +234,7 @@ export async function updateGameFields(
     queueRank: number | null;
     queueLocked: boolean;
     notes: string | null;
+    dnfReason: string | null;
   }>,
 ) {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
@@ -1028,6 +1040,21 @@ function mapGameSummary(row: GameRow): GameSummary {
     steamid64Owner: game.steamid64Owner,
     notes: game.notes,
     dnfReason: game.dnfReason,
+  };
+}
+
+function mapGameVisibilitySnapshot(row: GameRow): GameVisibilitySnapshot {
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    currentRotation: row.currentRotation,
+    queueRank: row.queueRank,
+    backlogSlot: row.backlogSlot,
+    completionType: row.completionType,
+    syncState: row.syncState,
+    playtimeMinutes: row.playtimeMinutes,
+    detailHref: `/games/${row.id}`,
   };
 }
 

@@ -36,16 +36,21 @@ export default async function OngoingPage() {
       {doneForNowCandidates.length > 0 ? (
         <section className="grid gap-2">
           <h2 className="text-base font-semibold tracking-normal">Ready to Mark Done for Now</h2>
-          <GameTable games={doneForNowCandidates} settings={settings} view="ongoing" />
+          <GameTable
+            games={doneForNowCandidates}
+            settings={settings}
+            view="ongoing"
+            visibilityScope="ongoing_done_for_now_candidate"
+          />
         </section>
       ) : null}
       <section className="grid gap-2">
         <h2 className="text-base font-semibold tracking-normal">Ongoing / No Finish Line</h2>
-        <GameTable games={ongoing} settings={settings} view="ongoing" />
+        <GameTable games={ongoing} settings={settings} view="ongoing" visibilityScope="ongoing_open_ended" />
       </section>
       <section className="grid gap-2">
         <h2 className="text-base font-semibold tracking-normal">Parked / Not Now</h2>
-        <GameTable games={parked} settings={settings} view="ongoing" />
+        <GameTable games={parked} settings={settings} view="ongoing" visibilityScope="ongoing_parked" />
       </section>
     </div>
   );
