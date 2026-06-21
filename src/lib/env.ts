@@ -8,10 +8,13 @@ export function isDatabaseConfigured() {
   return Boolean(process.env.DATABASE_URL);
 }
 
+export function getSteamApiKey() {
+  return (process.env.STEAM_API_KEY ?? "").trim();
+}
+
 export function getAllowedEmails() {
   return (process.env.APP_ALLOWED_EMAILS ?? "")
     .split(",")
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean);
 }
-

@@ -91,9 +91,12 @@ export type GameSummary = Pick<
   | "estimatedHours"
   | "steamReviewScore"
   | "steamReviewSummary"
+  | "releaseYear"
   | "lastPlayed"
+  | "dateAdded"
   | "lastSyncedAt"
   | "syncState"
+  | "steamid64Owner"
   | "notes"
   | "dnfReason"
 >;
@@ -151,6 +154,13 @@ export type QueueCandidate = Pick<
   | "queueRank"
 > & {
   tags?: string[] | null;
+  playtimeMinutes?: number;
+  steamReviewScore?: number | null;
+  releaseYear?: number | null;
+  status?: GameStatus;
+  currentRotation?: boolean;
+  syncState?: SyncState;
+  dateAdded?: Date | string | null;
 };
 
 export type QueueExplanation = {
@@ -166,4 +176,3 @@ export type Warning = {
   detail: string;
   severity: "info" | "warning" | "critical";
 };
-

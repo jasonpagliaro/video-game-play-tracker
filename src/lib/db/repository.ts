@@ -1,10 +1,12 @@
-import { and, asc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
 
 import {
   appSettings,
   games,
   importBatches,
+  steamAccounts,
   statusHistory,
+  syncRuns,
   type games as gamesTable,
 } from "@/db/schema";
 import {
@@ -18,16 +20,22 @@ import {
   type GameStatus,
   type PersonalInterest,
 } from "@/lib/backlog/constants";
-import { insertGamesWithCategoryBalance, rebalanceQueue as rebalanceQueueLogic } from "@/lib/backlog/queue";
+import {
+  filterQueueEligibleCandidates,
+  insertGamesWithCategoryBalance,
+  rebalanceQueue as rebalanceQueueLogic,
+} from "@/lib/backlog/queue";
 import { parseSteamCsv } from "@/lib/backlog/csv";
 import { calculatePriorityScore } from "@/lib/backlog/inference";
 import { normalizeTitle } from "@/lib/backlog/normalize";
 import { transitionGameStatus } from "@/lib/backlog/status";
 import type { AppSettings, Game, GameSummary, ParsedCsvGame, QueueCandidate } from "@/lib/backlog/types";
 import { isDatabaseConfigured } from "@/lib/env";
+import type { SteamLibraryGame, SteamLibrarySyncData } from "@/lib/steam/library";
 import { type AppUser, withUserDb } from "./client";
 
 type GameRow = typeof gamesTable.$inferSelect;
+type Tx = Parameters<Parameters<ReturnType<typeof import("./client").getDb>["transaction"]>[0]>[0];
 
 export type ImportDecision = "unqueued" | "queue" | "park" | "wont_complete" | "review";
 
@@ -37,6 +45,15 @@ export type ImportApplyResult = {
   updatedCount: number;
   skippedCount: number;
   rowCount: number;
+};
+
+export type SteamImportApplyResult = ImportApplyResult & {
+  steamid64: string;
+  displayName: string | null;
+  profileUrl: string | null;
+  syncRunId: string | null;
+  missingCount: number;
+  queuedCount: number;
 };
 
 export function defaultSettings(userId?: string): AppSettings {
@@ -344,6 +361,7 @@ export async function bulkUpdateGames(input: {
     }
 
     if (input.action === "add_to_queue" || input.action === "rebalance_selected") {
+      const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, input.user.id) });
       const existingQueue = (
         await tx.query.games.findMany({
           where: and(eq(games.userId, input.user.id), sql`${games.queueRank} is not null`),
@@ -352,14 +370,11 @@ export async function bulkUpdateGames(input: {
       )
         .filter((game) => !gameIds.includes(game.id))
         .map(mapQueueCandidate);
-      const selectedCandidates = selected.map(mapQueueCandidate);
-      const { queue } = insertGamesWithCategoryBalance(existingQueue, selectedCandidates);
-      for (const item of queue) {
-        await tx
-          .update(games)
-          .set({ queueRank: item.queueRank, updatedAt: new Date() })
-          .where(and(eq(games.userId, input.user.id), eq(games.id, item.id)));
-      }
+      const selectedCandidates = filterQueueEligibleCandidates(selected.map(mapQueueCandidate));
+      const { queue } = insertGamesWithCategoryBalance(existingQueue, selectedCandidates, {
+        windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
+      });
+      await persistQueueRanks(tx, input.user.id, queue);
     }
   });
 }
@@ -468,25 +483,7 @@ export async function applyCsvImport(input: {
     }
 
     if (input.decision === "queue" && importedIds.length > 0) {
-      const queueRows = await tx.query.games.findMany({
-        where: and(eq(games.userId, input.user.id), or(isNull(games.queueRank), inArray(games.id, importedIds))),
-      });
-      const existingQueue = (await tx.query.games.findMany({
-        where: and(eq(games.userId, input.user.id), sql`${games.queueRank} is not null`),
-        orderBy: [asc(games.queueRank)],
-      })).map(mapQueueCandidate);
-      const newCandidates = queueRows
-        .filter((game) => importedIds.includes(game.id))
-        .map(mapQueueCandidate);
-      const { queue } = insertGamesWithCategoryBalance(existingQueue, newCandidates);
-      for (const item of queue) {
-        if (!item.queueLocked) {
-          await tx
-            .update(games)
-            .set({ queueRank: item.queueRank, updatedAt: new Date() })
-            .where(and(eq(games.userId, input.user.id), eq(games.id, item.id)));
-        }
-      }
+      await insertImportedGamesIntoQueue(tx, input.user.id, importedIds);
     }
 
     const [batch] = await tx
@@ -512,6 +509,132 @@ export async function applyCsvImport(input: {
   });
 }
 
+export async function applySteamLibraryImport(input: {
+  user: AppUser;
+  library: SteamLibrarySyncData;
+  decision: ImportDecision;
+}): Promise<SteamImportApplyResult> {
+  if (!isDatabaseConfigured()) {
+    return {
+      batchId: null,
+      syncRunId: null,
+      steamid64: input.library.account.steamid64,
+      displayName: input.library.account.displayName,
+      profileUrl: input.library.account.profileUrl,
+      addedCount: input.library.validCount,
+      updatedCount: 0,
+      missingCount: 0,
+      queuedCount: input.decision === "queue" ? input.library.validCount : 0,
+      skippedCount: input.library.skippedCount,
+      rowCount: input.library.rowCount,
+    };
+  }
+
+  return withUserDb(input.user, async (tx) => {
+    const now = new Date();
+    const steamAccount = await upsertSteamAccount(tx, input.user.id, input.library.account, now);
+    let addedCount = 0;
+    let updatedCount = 0;
+    const importedIds: string[] = [];
+
+    for (const steamGame of input.library.games) {
+      const existing = await findExistingGameBySteamAppId(tx, input.user.id, steamGame.steamAppId);
+      if (existing) {
+        const [updated] = await tx
+          .update(games)
+          .set({
+            title: steamGame.title,
+            normalizedTitle: normalizeTitle(steamGame.title),
+            steamid64Owner: steamGame.steamid64Owner,
+            playtimeMinutes: steamGame.playtimeMinutes,
+            playtimeWindowsMinutes: steamGame.playtimeWindowsMinutes,
+            playtimeMacMinutes: steamGame.playtimeMacMinutes,
+            playtimeLinuxMinutes: steamGame.playtimeLinuxMinutes,
+            lastPlayed: steamGame.lastPlayed,
+            syncState: existing.syncState === "ignored" ? "ignored" : "synced",
+            lastSeenInSyncAt: now,
+            lastSyncedAt: now,
+            rawImportMetadata: steamGame.rawImportMetadata,
+            updatedAt: now,
+          })
+          .where(and(eq(games.userId, input.user.id), eq(games.id, existing.id)))
+          .returning();
+        updatedCount += 1;
+        if (updated) importedIds.push(updated.id);
+      } else {
+        const [created] = await tx
+          .insert(games)
+          .values({
+            userId: input.user.id,
+            title: steamGame.title,
+            normalizedTitle: normalizeTitle(steamGame.title),
+            steamAppId: steamGame.steamAppId,
+            steamid64Owner: steamGame.steamid64Owner,
+            source: "Steam",
+            playtimeMinutes: steamGame.playtimeMinutes,
+            playtimeWindowsMinutes: steamGame.playtimeWindowsMinutes,
+            playtimeMacMinutes: steamGame.playtimeMacMinutes,
+            playtimeLinuxMinutes: steamGame.playtimeLinuxMinutes,
+            lastPlayed: steamGame.lastPlayed,
+            completionType: steamGame.completionType,
+            backlogSlot: steamGame.backlogSlot,
+            priorityScore: steamGame.priorityScore,
+            status: statusForImportDecision(input.decision, steamGame),
+            syncState: "synced",
+            firstSeenAt: now,
+            lastSeenInSyncAt: now,
+            lastSyncedAt: now,
+            rawImportMetadata: steamGame.rawImportMetadata,
+          })
+          .returning();
+        addedCount += 1;
+        importedIds.push(created.id);
+      }
+    }
+
+    const missingCount = input.library.games.length > 0
+      ? await markMissingFromLatestSteamSync(tx, input.user.id, input.library.account.steamid64, input.library.games, now)
+      : 0;
+    const queuedCount = input.decision === "queue" && importedIds.length > 0
+      ? await insertImportedGamesIntoQueue(tx, input.user.id, importedIds)
+      : 0;
+
+    await tx
+      .update(steamAccounts)
+      .set({ lastLibrarySyncAt: now, updatedAt: now })
+      .where(and(eq(steamAccounts.userId, input.user.id), eq(steamAccounts.id, steamAccount.id)));
+
+    const [syncRun] = await tx
+      .insert(syncRuns)
+      .values({
+        userId: input.user.id,
+        steamAccountId: steamAccount.id,
+        syncType: "library",
+        completedAt: now,
+        status: "success",
+        addedCount,
+        updatedCount,
+        missingCount,
+        notes: `Decision: ${input.decision}; source: Steam Web API library sync`,
+      })
+      .returning();
+
+    return {
+      batchId: null,
+      syncRunId: syncRun.id,
+      steamid64: input.library.account.steamid64,
+      displayName: input.library.account.displayName,
+      profileUrl: input.library.account.profileUrl,
+      addedCount,
+      updatedCount,
+      missingCount,
+      queuedCount,
+      skippedCount: input.library.skippedCount,
+      rowCount: input.library.rowCount,
+    };
+  });
+}
+
 export async function rebalanceUserQueue(user: AppUser) {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
   return withUserDb(user, async (tx) => {
@@ -523,16 +646,11 @@ export async function rebalanceUserQueue(user: AppUser) {
     const { queue } = rebalanceQueueLogic(queueRows.map(mapQueueCandidate), {
       windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
     });
-    for (const item of queue) {
-      await tx
-        .update(games)
-        .set({ queueRank: item.queueRank, updatedAt: new Date() })
-        .where(and(eq(games.userId, user.id), eq(games.id, item.id)));
-    }
+    await persistQueueRanks(tx, user.id, queue);
   });
 }
 
-async function getActiveCount(tx: Parameters<Parameters<ReturnType<typeof import("./client").getDb>["transaction"]>[0]>[0], userId: string) {
+async function getActiveCount(tx: Tx, userId: string) {
   const result = await tx
     .select({ count: sql<number>`count(*)::int` })
     .from(games)
@@ -541,7 +659,7 @@ async function getActiveCount(tx: Parameters<Parameters<ReturnType<typeof import
 }
 
 async function findExistingGame(
-  tx: Parameters<Parameters<ReturnType<typeof import("./client").getDb>["transaction"]>[0]>[0],
+  tx: Tx,
   userId: string,
   game: ParsedCsvGame,
 ) {
@@ -556,7 +674,128 @@ async function findExistingGame(
   });
 }
 
-function statusForImportDecision(decision: ImportDecision, game: ParsedCsvGame): GameStatus {
+async function findExistingGameBySteamAppId(tx: Tx, userId: string, steamAppId: number) {
+  return tx.query.games.findFirst({
+    where: and(eq(games.userId, userId), eq(games.steamAppId, steamAppId)),
+  });
+}
+
+async function upsertSteamAccount(
+  tx: Tx,
+  userId: string,
+  account: SteamLibrarySyncData["account"],
+  now: Date,
+) {
+  const existing = await tx.query.steamAccounts.findFirst({
+    where: and(eq(steamAccounts.userId, userId), eq(steamAccounts.steamid64, account.steamid64)),
+  });
+  const values = {
+    displayName: account.displayName,
+    customProfileId: account.customProfileId,
+    steamid64: account.steamid64,
+    profileUrl: account.profileUrl,
+    apiKeyEncryptedOrEnvReference: "env:STEAM_API_KEY",
+    syncEnabled: true,
+    updatedAt: now,
+  };
+  if (existing) {
+    const [updated] = await tx
+      .update(steamAccounts)
+      .set(values)
+      .where(and(eq(steamAccounts.userId, userId), eq(steamAccounts.id, existing.id)))
+      .returning();
+    return updated ?? existing;
+  }
+  const [created] = await tx
+    .insert(steamAccounts)
+    .values({
+      userId,
+      ...values,
+    })
+    .returning();
+  if (!created) throw new Error("Steam account could not be saved.");
+  return created;
+}
+
+async function markMissingFromLatestSteamSync(
+  tx: Tx,
+  userId: string,
+  steamid64: string,
+  syncedGames: SteamLibraryGame[],
+  now: Date,
+) {
+  const syncedAppIds = syncedGames.map((game) => game.steamAppId);
+  if (syncedAppIds.length === 0) return 0;
+  const missingRows = await tx
+    .update(games)
+    .set({
+      syncState: "missing_from_latest_sync",
+      lastSyncedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(games.userId, userId),
+        eq(games.steamid64Owner, steamid64),
+        sql`${games.steamAppId} is not null`,
+        notInArray(games.steamAppId, syncedAppIds),
+        sql`${games.syncState} <> 'ignored'`,
+      ),
+    )
+    .returning({ id: games.id });
+  return missingRows.length;
+}
+
+async function insertImportedGamesIntoQueue(tx: Tx, userId: string, importedIds: string[]) {
+  const uniqueImportedIds = [...new Set(importedIds.filter(Boolean))];
+  if (uniqueImportedIds.length === 0) return 0;
+
+  const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, userId) });
+  const importedIdSet = new Set(uniqueImportedIds);
+  const existingQueueRows = await tx.query.games.findMany({
+    where: and(eq(games.userId, userId), sql`${games.queueRank} is not null`),
+    orderBy: [asc(games.queueRank)],
+  });
+  const importedRows = await tx.query.games.findMany({
+    where: and(eq(games.userId, userId), inArray(games.id, uniqueImportedIds)),
+    orderBy: [asc(games.title)],
+  });
+
+  const existingQueue = existingQueueRows
+    .filter((game) => !importedIdSet.has(game.id))
+    .map(mapQueueCandidate);
+  const newCandidates = filterQueueEligibleCandidates(importedRows.map(mapQueueCandidate));
+  if (newCandidates.length === 0) return 0;
+
+  const { queue } = insertGamesWithCategoryBalance(existingQueue, newCandidates, {
+    windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
+  });
+  const queuedCandidateIds = new Set(newCandidates.map((candidate) => candidate.id));
+  await persistQueueRanks(tx, userId, queue);
+  return queue.filter((item) => queuedCandidateIds.has(item.id) && item.queueRank != null).length;
+}
+
+async function persistQueueRanks(tx: Tx, userId: string, queue: QueueCandidate[]) {
+  const movable = queue.filter((item) => !item.queueLocked && item.queueRank != null);
+  const now = new Date();
+  for (let index = 0; index < movable.length; index += 1) {
+    await tx
+      .update(games)
+      .set({ queueRank: -(index + 1) * 1000000, updatedAt: now })
+      .where(and(eq(games.userId, userId), eq(games.id, movable[index].id)));
+  }
+  for (const item of movable) {
+    await tx
+      .update(games)
+      .set({ queueRank: item.queueRank, updatedAt: now })
+      .where(and(eq(games.userId, userId), eq(games.id, item.id)));
+  }
+}
+
+function statusForImportDecision(
+  decision: ImportDecision,
+  game: Pick<ParsedCsvGame | SteamLibraryGame, "completionType" | "backlogSlot">,
+): GameStatus {
   if (decision === "park") return "parked";
   if (decision === "wont_complete") return "wont_complete";
   if (PARKING_COMPLETION_TYPES.includes(game.completionType) || game.backlogSlot === "parking_lot") {
@@ -673,9 +912,12 @@ function mapGameSummary(row: GameRow): GameSummary {
     estimatedHours: game.estimatedHours,
     steamReviewScore: game.steamReviewScore,
     steamReviewSummary: game.steamReviewSummary,
+    releaseYear: game.releaseYear,
     lastPlayed: game.lastPlayed,
+    dateAdded: game.dateAdded,
     lastSyncedAt: game.lastSyncedAt,
     syncState: game.syncState,
+    steamid64Owner: game.steamid64Owner,
     notes: game.notes,
     dnfReason: game.dnfReason,
   };
@@ -693,5 +935,12 @@ function mapQueueCandidate(row: GameRow): QueueCandidate {
     queueLocked: row.queueLocked,
     queueRank: row.queueRank,
     tags: row.tags,
+    playtimeMinutes: row.playtimeMinutes,
+    steamReviewScore: row.steamReviewScore,
+    releaseYear: row.releaseYear,
+    status: row.status,
+    currentRotation: row.currentRotation,
+    syncState: row.syncState,
+    dateAdded: row.dateAdded,
   };
 }

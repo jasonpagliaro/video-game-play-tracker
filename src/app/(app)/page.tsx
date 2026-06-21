@@ -33,7 +33,7 @@ export default async function DashboardPage() {
         actions={
           <Button asChild>
             <Link href="/import">
-              Import CSV
+              Import / sync
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
@@ -83,4 +83,3 @@ export default async function DashboardPage() {
     </div>
   );
 }
-

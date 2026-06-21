@@ -1,9 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateCategoryDistribution, insertGamesWithCategoryBalance } from "@/lib/backlog/queue";
+import {
+  calculateCategoryDistribution,
+  filterQueueEligibleCandidates,
+  insertGamesWithCategoryBalance,
+} from "@/lib/backlog/queue";
 import type { QueueCandidate } from "@/lib/backlog/types";
 
-function game(id: string, slot: QueueCandidate["backlogSlot"], priorityScore = 50): QueueCandidate {
+function game(
+  id: string,
+  slot: QueueCandidate["backlogSlot"],
+  priorityScore = 50,
+  overrides: Partial<QueueCandidate> = {},
+): QueueCandidate {
   return {
     id,
     title: id,
@@ -14,6 +23,7 @@ function game(id: string, slot: QueueCandidate["backlogSlot"], priorityScore = 5
     estimatedHours: null,
     queueLocked: false,
     queueRank: null,
+    ...overrides,
   };
 }
 
@@ -46,5 +56,42 @@ describe("queue balancing", () => {
     const { queue } = insertGamesWithCategoryBalance([locked], [game("a", "action"), game("b", "puzzle")]);
     expect(queue[0]?.id).toBe("locked");
   });
-});
 
+  it("filters terminal, active, and ignored games out of auto-queue candidates", () => {
+    const candidates = [
+      game("ready", "action", 50, { status: "not_started" }),
+      game("done", "action", 90, { status: "completed" }),
+      game("dnf", "action", 90, { status: "dnf" }),
+      game("parked", "action", 90, { status: "parked" }),
+      game("wont", "action", 90, { status: "wont_complete" }),
+      game("active", "action", 90, { currentRotation: true }),
+      game("ignored", "action", 90, { syncState: "ignored" }),
+    ];
+
+    expect(filterQueueEligibleCandidates(candidates).map((candidate) => candidate.id)).toEqual(["ready"]);
+  });
+
+  it("uses release year as a close-score tie breaker", () => {
+    const { queue } = insertGamesWithCategoryBalance(
+      [],
+      [
+        game("newer", "action", 70, { releaseYear: 2020 }),
+        game("older", "action", 70, { releaseYear: 1998 }),
+      ],
+    );
+
+    expect(queue[0]?.id).toBe("older");
+  });
+
+  it("falls back to date added and title for stable ordering", () => {
+    const { queue } = insertGamesWithCategoryBalance(
+      [],
+      [
+        game("second", "puzzle", 70, { dateAdded: new Date("2024-01-02") }),
+        game("first", "puzzle", 70, { dateAdded: new Date("2024-01-01") }),
+      ],
+    );
+
+    expect(queue.map((item) => item.id)).toEqual(["first", "second"]);
+  });
+});
