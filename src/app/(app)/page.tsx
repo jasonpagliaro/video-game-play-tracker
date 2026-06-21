@@ -1,32 +1,21 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import { GameTable } from "@/components/backlog/game-table";
 import { PageHeader } from "@/components/backlog/page-header";
-import { MetricStrip } from "@/components/dashboard/metric-strip";
-import { QueueBalancePanel } from "@/components/queue/queue-balance-panel";
+import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
+import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
+import { DashboardStatusGrid } from "@/components/dashboard/dashboard-status-grid";
 import { WarningPanel } from "@/components/warnings/warning-panel";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
-import { formatMinutes } from "@/lib/backlog/format";
-import { isDoneForNowCandidate } from "@/lib/backlog/status";
-import { summarizeWarnings } from "@/lib/backlog/warnings";
+import { getDashboardSummary } from "@/lib/backlog/dashboard";
 import { getGames, getSettings } from "@/lib/db/repository";
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const [settings, games] = await Promise.all([getSettings(user), getGames(user)]);
-  const active = games.filter((game) => game.currentRotation);
-  const queued = games.filter((game) => game.queueRank != null).sort((a, b) => (a.queueRank ?? 0) - (b.queueRank ?? 0));
-  const completed = games.filter((game) => game.status === "completed").length;
-  const doneForNow = games.filter((game) => game.status === "done_for_now").length;
-  const dnf = games.filter((game) => game.status === "dnf").length;
-  const parked = games.filter((game) => game.status === "parked").length;
-  const installed = games.filter((game) => game.installed).length;
-  const importedReview = games.filter((game) => game.syncState === "imported" && game.queueRank == null && !game.currentRotation).length;
-  const doneForNowCandidates = games.filter(isDoneForNowCandidate).length;
-  const warnings = summarizeWarnings(games, settings);
+  const summary = getDashboardSummary(games, settings);
 
   return (
     <div className="grid gap-5 p-4 lg:p-6">
@@ -42,47 +31,61 @@ export default async function DashboardPage() {
           </Button>
         }
       />
-      <MetricStrip
-        metrics={[
-          { label: "Active rotation", value: `${active.length}/${settings.maxActiveRotationCount}`, detail: "Configured active limit" },
-          { label: "Installed", value: installed, detail: settings.maxInstalledCount ? `Limit ${settings.maxInstalledCount}` : "No warning limit" },
-          { label: "Completed / Done", value: `${completed}/${doneForNow}`, detail: `${formatMinutes(games.reduce((sum, game) => sum + game.playtimeMinutes, 0))} tracked` },
-          { label: "DNF / Parked", value: `${dnf}/${parked}`, detail: `${importedReview} imports; ${doneForNowCandidates} done-for-now candidates` },
-        ]}
-      />
-      <WarningPanel warnings={warnings} />
-      <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Current active rotation</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <GameTable games={active} settings={settings} view="rotation" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Next up</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-3">
-              {queued.slice(0, 8).map((game) => (
-                <div key={game.id} className="grid grid-cols-[48px_1fr] gap-3 rounded-md border border-border p-3 text-sm">
-                  <div className="font-mono text-muted-foreground">{game.queueRank ?? "-"}</div>
-                  <div>
-                    <Link href={`/games/${game.id}`} className="font-medium hover:underline">
-                      {game.title}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">{game.backlogSlot} - {game.completionType}</div>
-                  </div>
-                </div>
-              ))}
-              {queued.length === 0 ? <div className="text-sm text-muted-foreground">No queued games yet.</div> : null}
-            </div>
-          </CardContent>
-        </Card>
+      <DashboardStatusGrid summary={summary} settings={settings} />
+      <WarningPanel warnings={summary.warnings} />
+      <DashboardQueueStatus summary={summary} />
+      <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
+        <DashboardSection
+          title="Current active rotation"
+          href="/rotation"
+          empty="No active games in rotation."
+        >
+          {summary.activeGames.map((game, index) => (
+            <DashboardGameCard key={game.id} game={game} priorityImage={index < 2} />
+          ))}
+        </DashboardSection>
+        <DashboardSection
+          title="Next up"
+          href="/queue"
+          empty="No queued games yet."
+        >
+          {summary.nextWindowGames.map((game, index) => (
+            <DashboardGameCard key={game.id} game={game} queuePosition={index + 1} priorityImage={index < 2} />
+          ))}
+        </DashboardSection>
       </div>
-      <QueueBalancePanel games={games} />
     </div>
+  );
+}
+
+function DashboardSection({
+  title,
+  href,
+  empty,
+  children,
+}: {
+  title: string;
+  href: string;
+  empty: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="grid gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">{title}</h2>
+        <Button asChild variant="ghost" size="sm">
+          <Link href={href}>
+            View all
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2">
+        {children}
+      </div>
+      {Array.isArray(children) && children.length === 0 ? (
+        <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">{empty}</div>
+      ) : null}
+    </section>
   );
 }
