@@ -20,18 +20,24 @@ import {
 import { isQueueCommand, isQueueSortPreset } from "@/lib/backlog/queue";
 import { requireUser } from "@/lib/auth";
 import {
+  addQueuedGameToRotation,
   applyQueueCommand,
   bulkUpdateGames,
+  fillRotationFromQueue,
   getGameVisibilitySnapshot,
+  markGameWontCompleteFromSuggestion,
+  parkGameForLater,
   rebalanceUserQueue,
+  returnParkedGameToQueue,
   setCurrentRotation,
   setInstalled,
+  skipRotationSuggestion,
   sortUserQueue,
   updateGameFields,
   updateGameStatus,
 } from "@/lib/db/repository";
 
-function revalidateApp() {
+function revalidateApp(gameId?: string) {
   revalidatePath("/");
   revalidatePath("/backlog");
   revalidatePath("/rotation");
@@ -40,6 +46,7 @@ function revalidateApp() {
   revalidatePath("/dnf");
   revalidatePath("/parking-lot");
   revalidatePath("/ongoing");
+  if (gameId) revalidatePath(`/games/${gameId}`);
 }
 
 function errorMessage(error: unknown) {
@@ -173,6 +180,47 @@ export async function rebalanceQueueAction() {
   const user = await requireUser();
   await rebalanceUserQueue(user);
   revalidateApp();
+}
+
+export async function fillRotationFromQueueAction() {
+  const user = await requireUser();
+  await fillRotationFromQueue(user);
+  revalidateApp();
+}
+
+export async function addRotationSuggestionToRotationAction(formData: FormData) {
+  const user = await requireUser();
+  const gameId = String(formData.get("gameId"));
+  await addQueuedGameToRotation(user, gameId);
+  revalidateApp(gameId);
+}
+
+export async function skipRotationSuggestionAction(formData: FormData) {
+  const user = await requireUser();
+  const gameId = String(formData.get("gameId"));
+  await skipRotationSuggestion(user, gameId);
+  revalidateApp(gameId);
+}
+
+export async function parkGameForLaterAction(formData: FormData) {
+  const user = await requireUser();
+  const gameId = String(formData.get("gameId"));
+  await parkGameForLater(user, gameId);
+  revalidateApp(gameId);
+}
+
+export async function returnParkedGameToQueueAction(formData: FormData) {
+  const user = await requireUser();
+  const gameId = String(formData.get("gameId"));
+  await returnParkedGameToQueue(user, gameId);
+  revalidateApp(gameId);
+}
+
+export async function markGameWontCompleteFromSuggestionAction(formData: FormData) {
+  const user = await requireUser();
+  const gameId = String(formData.get("gameId"));
+  await markGameWontCompleteFromSuggestion(user, gameId);
+  revalidateApp(gameId);
 }
 
 export async function bulkUpdateGamesAction(formData: FormData) {

@@ -58,17 +58,27 @@ export type TransitionPatch = {
   dateCompleted?: Date;
   dateDnf?: Date;
   dnfReason?: string | null;
+  rotationSkipCount?: number;
+  rotationSkipUntil?: Date | null;
+  rotationLastSkippedAt?: Date | null;
+  parkedForLater?: boolean;
+  reassessAfter?: Date | null;
   needsReplacement?: boolean;
 };
 
 export function transitionGameStatus(input: StatusTransitionInput): TransitionPatch {
   const now = input.now ?? new Date();
-  const patch: TransitionPatch = { status: input.newStatus };
+  const patch: TransitionPatch = {
+    status: input.newStatus,
+    parkedForLater: false,
+    reassessAfter: null,
+  };
 
   if (input.newStatus === "completed" || input.newStatus === "done_for_now") {
     patch.dateCompleted = input.game.dateCompleted ?? now;
     patch.currentRotation = false;
     patch.queueRank = null;
+    clearRotationPlanning(patch);
     if (input.settings.completedSetsInstalledFalse) patch.installed = false;
     return patch;
   }
@@ -81,6 +91,7 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
     patch.dnfReason = input.dnfReason?.trim() || input.game.dnfReason;
     patch.currentRotation = false;
     patch.queueRank = null;
+    clearRotationPlanning(patch);
     if (input.settings.dnfSetsInstalledFalse) patch.installed = false;
     return patch;
   }
@@ -88,6 +99,7 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
   if (input.newStatus === "parked") {
     patch.currentRotation = false;
     patch.queueRank = null;
+    clearRotationPlanning(patch);
     if (input.settings.parkedSetsInstalledFalse) patch.installed = false;
     return patch;
   }
@@ -96,11 +108,13 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
     patch.currentRotation = false;
     patch.queueRank = null;
     patch.installed = false;
+    clearRotationPlanning(patch);
     return patch;
   }
 
   if (input.newStatus === "in_progress") {
     patch.dateStarted = input.game.dateStarted ?? now;
+    clearRotationPlanning(patch);
     if (input.settings.inProgressSetsInstalledTrue) patch.installed = true;
     if (!input.game.currentRotation && input.settings.inProgressAddsToRotationWhenSpace) {
       if (input.activeCount < input.settings.maxActiveRotationCount) {
@@ -114,13 +128,23 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
 
   if (input.newStatus === "installed") {
     patch.installed = true;
+    clearRotationPlanning(patch);
     return patch;
   }
 
   if (input.newStatus === "not_started") {
     patch.currentRotation = false;
+    clearRotationPlanning(patch);
     return patch;
   }
 
   return patch;
+}
+
+function clearRotationPlanning(patch: TransitionPatch) {
+  patch.rotationSkipCount = 0;
+  patch.rotationSkipUntil = null;
+  patch.rotationLastSkippedAt = null;
+  patch.parkedForLater = false;
+  patch.reassessAfter = null;
 }

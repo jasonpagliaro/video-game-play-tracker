@@ -63,12 +63,18 @@ export const appSettings = pgTable(
     autoQueueNewImports: boolean("auto_queue_new_imports").notNull().default(false),
     protectManualFieldsFromSync: boolean("protect_manual_fields_from_sync").notNull().default(true),
     queueSlidingWindowSize: integer("queue_sliding_window_size").notNull().default(5),
+    rotationSkipCooldownDays: integer("rotation_skip_cooldown_days").notNull().default(90),
+    rotationSkipLimit: integer("rotation_skip_limit").notNull().default(3),
+    parkedReassessmentDays: integer("parked_reassessment_days").notNull().default(180),
     slotWeights: jsonb("slot_weights").$type<Record<string, number>>().notNull().default({}),
     ...timestamps,
   },
   (table) => [
     uniqueIndex("app_settings_user_id_uq").on(table.userId),
     check("app_settings_max_active_positive", sql`${table.maxActiveRotationCount} > 0`),
+    check("app_settings_rotation_skip_cooldown_positive", sql`${table.rotationSkipCooldownDays} > 0`),
+    check("app_settings_rotation_skip_limit_positive", sql`${table.rotationSkipLimit} > 0`),
+    check("app_settings_parked_reassessment_positive", sql`${table.parkedReassessmentDays} > 0`),
   ],
 );
 
@@ -103,6 +109,11 @@ export const games = pgTable(
     priorityScore: integer("priority_score").notNull().default(50),
     queueRank: integer("queue_rank"),
     queueLocked: boolean("queue_locked").notNull().default(false),
+    rotationSkipCount: integer("rotation_skip_count").notNull().default(0),
+    rotationSkipUntil: timestamp("rotation_skip_until", { withTimezone: true }),
+    rotationLastSkippedAt: timestamp("rotation_last_skipped_at", { withTimezone: true }),
+    parkedForLater: boolean("parked_for_later").notNull().default(false),
+    reassessAfter: timestamp("reassess_after", { withTimezone: true }),
     status: gameStatusEnum("status").notNull().default("not_started"),
     installed: boolean("installed").notNull().default(false),
     currentRotation: boolean("current_rotation").notNull().default(false),
@@ -126,6 +137,7 @@ export const games = pgTable(
     index("games_user_status_idx").on(table.userId, table.status),
     index("games_user_rotation_idx").on(table.userId, table.currentRotation),
     index("games_user_queue_idx").on(table.userId, table.queueRank),
+    index("games_user_reassess_idx").on(table.userId, table.reassessAfter),
     uniqueIndex("games_user_steam_app_id_uq")
       .on(table.userId, table.steamAppId)
       .where(sql`${table.steamAppId} is not null`),
@@ -136,6 +148,7 @@ export const games = pgTable(
       .on(table.userId, table.queueRank)
       .where(sql`${table.queueRank} is not null`),
     check("games_playtime_nonnegative", sql`${table.playtimeMinutes} >= 0`),
+    check("games_rotation_skip_count_nonnegative", sql`${table.rotationSkipCount} >= 0`),
   ],
 );
 
@@ -277,4 +290,3 @@ export const checkInsRelations = relations(checkIns, ({ one }) => ({
 }));
 
 export const rlsAuthenticatedRole = authenticatedRole;
-

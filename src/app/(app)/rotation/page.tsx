@@ -1,5 +1,6 @@
 import { GameTable } from "@/components/backlog/game-table";
 import { PageHeader } from "@/components/backlog/page-header";
+import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
 import { WarningPanel } from "@/components/warnings/warning-panel";
 import { requireUser } from "@/lib/auth";
 import { summarizeWarnings } from "@/lib/backlog/warnings";
@@ -16,8 +17,8 @@ export default async function RotationPage() {
         description={`Active games where current_rotation is true. Limit: ${settings.maxActiveRotationCount}.`}
       />
       <WarningPanel warnings={summarizeWarnings(games, settings).filter((warning) => warning.code.includes("rotation") || warning.code.includes("active"))} />
+      <RotationFillPanel games={games} settings={settings} title="Add from Next Up" />
       <GameTable games={active.length ? active : games} settings={settings} view="rotation" />
     </div>
   );
 }
-

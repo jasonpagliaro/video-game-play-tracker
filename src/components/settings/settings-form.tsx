@@ -36,6 +36,24 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
       </Card>
       <Card>
         <CardHeader>
+          <CardTitle className="text-base">Rotation suggestions</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 md:grid-cols-3">
+          <NumberField
+            name="rotationSkipCooldownDays"
+            label="Skip cooldown days"
+            defaultValue={settings.rotationSkipCooldownDays}
+          />
+          <NumberField name="rotationSkipLimit" label="Skip limit" defaultValue={settings.rotationSkipLimit} />
+          <NumberField
+            name="parkedReassessmentDays"
+            label="Parked reassessment days"
+            defaultValue={settings.parkedReassessmentDays}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">Transition defaults</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">

@@ -859,6 +859,7 @@ function canAddToQueue(game: GameSummary) {
   return (
     game.queueRank == null &&
     !game.currentRotation &&
+    !game.parkedForLater &&
     game.syncState !== "ignored" &&
     game.status !== "completed" &&
     game.status !== "done_for_now" &&

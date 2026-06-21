@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/backlog/page-header";
 import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
 import { DashboardStatusGrid } from "@/components/dashboard/dashboard-status-grid";
+import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
 import { WarningPanel } from "@/components/warnings/warning-panel";
 import { Button } from "@/components/ui/button";
 import { requireUser } from "@/lib/auth";
@@ -33,6 +34,7 @@ export default async function DashboardPage() {
       />
       <DashboardStatusGrid summary={summary} settings={settings} />
       <WarningPanel warnings={summary.warnings} />
+      <RotationFillPanel games={games} settings={settings} />
       <DashboardSection
         title="Current active rotation"
         href="/rotation"

@@ -122,6 +122,7 @@ export function rebalanceQueue(queue: QueueCandidate[], options?: { windowSize?:
 
 export function isQueueEligible(candidate: QueueCandidate) {
   if (candidate.currentRotation) return false;
+  if (candidate.parkedForLater) return false;
   if (candidate.syncState === "ignored") return false;
   if (
     candidate.status === "completed" ||

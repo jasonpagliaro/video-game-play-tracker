@@ -21,6 +21,9 @@ export type AppSettings = {
   autoQueueNewImports: boolean;
   protectManualFieldsFromSync: boolean;
   queueSlidingWindowSize: number;
+  rotationSkipCooldownDays: number;
+  rotationSkipLimit: number;
+  parkedReassessmentDays: number;
   slotWeights: Record<string, number>;
 };
 
@@ -51,6 +54,11 @@ export type Game = {
   priorityScore: number;
   queueRank: number | null;
   queueLocked: boolean;
+  rotationSkipCount: number;
+  rotationSkipUntil: Date | null;
+  rotationLastSkippedAt: Date | null;
+  parkedForLater: boolean;
+  reassessAfter: Date | null;
   status: GameStatus;
   installed: boolean;
   currentRotation: boolean;
@@ -85,6 +93,11 @@ export type GameSummary = Pick<
   | "priorityScore"
   | "queueRank"
   | "queueLocked"
+  | "rotationSkipCount"
+  | "rotationSkipUntil"
+  | "rotationLastSkippedAt"
+  | "parkedForLater"
+  | "reassessAfter"
   | "personalInterest"
   | "playtimeMinutes"
   | "achievementPercent"
@@ -162,6 +175,7 @@ export type QueueCandidate = Pick<
   currentRotation?: boolean;
   syncState?: SyncState;
   dateAdded?: Date | string | null;
+  parkedForLater?: boolean;
 };
 
 export type QueueExplanation = {

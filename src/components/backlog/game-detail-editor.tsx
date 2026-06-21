@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Minus, Plus } from "lucide-react";
+import { ListPlus, Minus, Plus } from "lucide-react";
 
 import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
 import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
@@ -28,8 +28,13 @@ import {
   type PersonalInterest,
 } from "@/lib/backlog/constants";
 import { isGameStatus, type GameVisibilitySnapshot } from "@/lib/backlog/autosave";
+import { formatDate } from "@/lib/backlog/format";
 import type { AppSettings, Game, GameSummary } from "@/lib/backlog/types";
-import { autoSaveGameFieldAction, queueCommandAction } from "@/server/actions/game-actions";
+import {
+  autoSaveGameFieldAction,
+  queueCommandAction,
+  returnParkedGameToQueueAction,
+} from "@/server/actions/game-actions";
 
 export function GameDetailEditor({
   game,
@@ -223,6 +228,25 @@ function AutoSaveSelectField({
 function QueueMembershipControl({ game }: { game: Game }) {
   const queued = game.queueRank != null;
   const eligible = canAddToQueue(game);
+  if (game.parkedForLater) {
+    return (
+      <div className="grid gap-2">
+        <Label>Queue</Label>
+        <div className="flex min-h-9 flex-wrap items-center gap-2">
+          <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+            Parked until {formatDate(game.reassessAfter)}
+          </span>
+          <form action={returnParkedGameToQueueAction}>
+            <input type="hidden" name="gameId" value={game.id} />
+            <Button type="submit" size="sm" variant="outline" className="h-8 gap-1">
+              <ListPlus className="h-3.5 w-3.5" />
+              Return to queue
+            </Button>
+          </form>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="grid gap-2">
       <Label>Queue</Label>
@@ -258,6 +282,7 @@ function canAddToQueue(game: Game) {
   return (
     game.queueRank == null &&
     !game.currentRotation &&
+    !game.parkedForLater &&
     game.syncState !== "ignored" &&
     game.status !== "completed" &&
     game.status !== "done_for_now" &&

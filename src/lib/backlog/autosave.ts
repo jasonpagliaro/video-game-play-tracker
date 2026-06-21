@@ -72,6 +72,9 @@ export type AutoSaveSettingsFieldInput =
   | { field: "checkinIntervalDays"; value: string }
   | { field: "checkinIntervalHoursPlayed"; value: string }
   | { field: "queueSlidingWindowSize"; value: string }
+  | { field: "rotationSkipCooldownDays"; value: string }
+  | { field: "rotationSkipLimit"; value: string }
+  | { field: "parkedReassessmentDays"; value: string }
   | { field: "completedSetsInstalledFalse"; value: boolean }
   | { field: "dnfSetsInstalledFalse"; value: boolean }
   | { field: "parkedSetsInstalledFalse"; value: boolean }

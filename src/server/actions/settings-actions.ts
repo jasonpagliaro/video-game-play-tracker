@@ -14,6 +14,9 @@ import type { AppSettings } from "@/lib/backlog/types";
 
 function revalidateSettings() {
   revalidatePath("/");
+  revalidatePath("/rotation");
+  revalidatePath("/queue");
+  revalidatePath("/ongoing");
   revalidatePath("/settings");
 }
 
@@ -48,6 +51,18 @@ export async function autoSaveSettingsFieldAction(
       const parsed = parsePositiveInteger(input.value, "Queue sliding window size", 3);
       if (!parsed.ok) return parsed;
       patch.queueSlidingWindowSize = parsed.value;
+    } else if (input.field === "rotationSkipCooldownDays") {
+      const parsed = parsePositiveInteger(input.value, "Rotation skip cooldown days", 1);
+      if (!parsed.ok) return parsed;
+      patch.rotationSkipCooldownDays = parsed.value;
+    } else if (input.field === "rotationSkipLimit") {
+      const parsed = parsePositiveInteger(input.value, "Rotation skip limit", 1);
+      if (!parsed.ok) return parsed;
+      patch.rotationSkipLimit = parsed.value;
+    } else if (input.field === "parkedReassessmentDays") {
+      const parsed = parsePositiveInteger(input.value, "Parked reassessment days", 1);
+      if (!parsed.ok) return parsed;
+      patch.parkedReassessmentDays = parsed.value;
     } else if (typeof input.value === "boolean") {
       patch[input.field] = input.value;
     } else {
@@ -71,6 +86,9 @@ export async function updateSettingsAction(formData: FormData) {
     checkinIntervalDays: Number(formData.get("checkinIntervalDays") ?? 7),
     checkinIntervalHoursPlayed: Number(formData.get("checkinIntervalHoursPlayed") ?? 2),
     queueSlidingWindowSize: Number(formData.get("queueSlidingWindowSize") ?? 5),
+    rotationSkipCooldownDays: Number(formData.get("rotationSkipCooldownDays") ?? 90),
+    rotationSkipLimit: Number(formData.get("rotationSkipLimit") ?? 3),
+    parkedReassessmentDays: Number(formData.get("parkedReassessmentDays") ?? 180),
     completedSetsInstalledFalse: formData.get("completedSetsInstalledFalse") === "on",
     dnfSetsInstalledFalse: formData.get("dnfSetsInstalledFalse") === "on",
     parkedSetsInstalledFalse: formData.get("parkedSetsInstalledFalse") === "on",

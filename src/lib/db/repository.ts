@@ -12,7 +12,10 @@ import {
 import {
   DEFAULT_ACTIVE_ROTATION_COUNT,
   DEFAULT_CHECKIN_INTERVAL_DAYS,
+  DEFAULT_PARKED_REASSESSMENT_DAYS,
   DEFAULT_QUEUE_WINDOW_SIZE,
+  DEFAULT_ROTATION_SKIP_COOLDOWN_DAYS,
+  DEFAULT_ROTATION_SKIP_LIMIT,
   DEFAULT_SLOT_WEIGHTS,
   OPEN_ENDED_COMPLETION_TYPES,
   type BacklogSlot,
@@ -23,6 +26,7 @@ import {
 import {
   filterQueueEligibleCandidates,
   insertGamesWithCategoryBalance,
+  rankQueueSequentially,
   reorderQueueByCommand,
   rebalanceQueue as rebalanceQueueLogic,
   sortQueueByPreset,
@@ -32,6 +36,15 @@ import {
 import { parseSteamCsv } from "@/lib/backlog/csv";
 import { calculatePriorityScore, inferBacklogSlot, inferCompletionType } from "@/lib/backlog/inference";
 import { normalizeTitle } from "@/lib/backlog/normalize";
+import {
+  buildAddToRotationPatch,
+  buildParkForLaterPatch,
+  buildReturnFromParkedPatch,
+  buildRotationSkipPatch,
+  buildWontCompletePatch,
+  getRotationFillCandidates,
+  isRotationFillCandidate,
+} from "@/lib/backlog/rotation-fill";
 import { transitionGameStatus } from "@/lib/backlog/status";
 import type { GameVisibilitySnapshot } from "@/lib/backlog/autosave";
 import type { AppSettings, Game, GameSummary, ParsedCsvGame, QueueCandidate } from "@/lib/backlog/types";
@@ -82,6 +95,9 @@ export function defaultSettings(userId?: string): AppSettings {
     autoQueueNewImports: false,
     protectManualFieldsFromSync: true,
     queueSlidingWindowSize: DEFAULT_QUEUE_WINDOW_SIZE,
+    rotationSkipCooldownDays: DEFAULT_ROTATION_SKIP_COOLDOWN_DAYS,
+    rotationSkipLimit: DEFAULT_ROTATION_SKIP_LIMIT,
+    parkedReassessmentDays: DEFAULT_PARKED_REASSESSMENT_DAYS,
     slotWeights: DEFAULT_SLOT_WEIGHTS,
   };
 }
@@ -797,12 +813,140 @@ export async function sortUserQueue(user: AppUser, preset: QueueSortPreset) {
   });
 }
 
+export async function fillRotationFromQueue(user: AppUser) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const settings = await getSettingsForUser(tx, user.id);
+    const rows = await tx.query.games.findMany({
+      where: eq(games.userId, user.id),
+      orderBy: [asc(games.queueRank), asc(games.title)],
+    });
+    const candidates = getRotationFillCandidates(rows.map(mapGameSummary), settings);
+    if (candidates.length === 0) return 0;
+    const now = new Date();
+    for (const candidate of candidates) {
+      await tx
+        .update(games)
+        .set({ ...buildAddToRotationPatch(), updatedAt: now })
+        .where(and(eq(games.userId, user.id), eq(games.id, candidate.id)));
+    }
+    await compactQueueRanks(tx, user.id);
+    return candidates.length;
+  });
+}
+
+export async function addQueuedGameToRotation(user: AppUser, gameId: string) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const settings = await getSettingsForUser(tx, user.id);
+    const activeCount = await getActiveCount(tx, user.id);
+    if (activeCount >= settings.maxActiveRotationCount) {
+      throw new Error("Rotation is already full.");
+    }
+    const target = await tx.query.games.findFirst({ where: and(eq(games.userId, user.id), eq(games.id, gameId)) });
+    if (!target) throw new Error("Game not found.");
+    if (!isRotationFillCandidate(mapGameSummary(target))) {
+      throw new Error("This game is not eligible for rotation fill.");
+    }
+    await tx
+      .update(games)
+      .set({ ...buildAddToRotationPatch(), updatedAt: new Date() })
+      .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
+    await compactQueueRanks(tx, user.id);
+  });
+}
+
+export async function skipRotationSuggestion(user: AppUser, gameId: string) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const settings = await getSettingsForUser(tx, user.id);
+    const target = await tx.query.games.findFirst({ where: and(eq(games.userId, user.id), eq(games.id, gameId)) });
+    if (!target) throw new Error("Game not found.");
+    const candidate = mapGameSummary(target);
+    if (!isRotationFillCandidate(candidate)) {
+      throw new Error("This game is not available to skip right now.");
+    }
+    await tx
+      .update(games)
+      .set({ ...buildRotationSkipPatch(candidate, settings), updatedAt: new Date() })
+      .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
+  });
+}
+
+export async function parkGameForLater(user: AppUser, gameId: string) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const settings = await getSettingsForUser(tx, user.id);
+    const target = await tx.query.games.findFirst({ where: and(eq(games.userId, user.id), eq(games.id, gameId)) });
+    if (!target) throw new Error("Game not found.");
+    const patch = buildParkForLaterPatch(settings);
+    await tx
+      .update(games)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
+    await insertStatusHistoryIfChanged(tx, user.id, target, "parked", "Parked for later reassessment");
+    if (target.queueRank != null) await compactQueueRanks(tx, user.id);
+  });
+}
+
+export async function returnParkedGameToQueue(user: AppUser, gameId: string) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const target = await tx.query.games.findFirst({ where: and(eq(games.userId, user.id), eq(games.id, gameId)) });
+    if (!target) throw new Error("Game not found.");
+    if (!target.parkedForLater) throw new Error("Only Parked-for-later games can be returned from this action.");
+    const patch = buildReturnFromParkedPatch();
+    await tx
+      .update(games)
+      .set({ ...patch, updatedAt: new Date() })
+      .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
+    await insertStatusHistoryIfChanged(tx, user.id, target, "not_started", "Returned from Parked for later");
+    return insertImportedGamesIntoQueue(tx, user.id, [gameId]);
+  });
+}
+
+export async function markGameWontCompleteFromSuggestion(user: AppUser, gameId: string) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const target = await tx.query.games.findFirst({ where: and(eq(games.userId, user.id), eq(games.id, gameId)) });
+    if (!target) throw new Error("Game not found.");
+    await tx
+      .update(games)
+      .set({ ...buildWontCompletePatch(), updatedAt: new Date() })
+      .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
+    await insertStatusHistoryIfChanged(tx, user.id, target, "wont_complete", "Marked from rotation suggestion");
+    if (target.queueRank != null) await compactQueueRanks(tx, user.id);
+  });
+}
+
 async function getActiveCount(tx: Tx, userId: string) {
   const result = await tx
     .select({ count: sql<number>`count(*)::int` })
     .from(games)
     .where(and(eq(games.userId, userId), eq(games.currentRotation, true)));
   return result[0]?.count ?? 0;
+}
+
+async function getSettingsForUser(tx: Tx, userId: string) {
+  const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, userId) });
+  return settingsRow ? mapSettings(settingsRow) : defaultSettings(userId);
+}
+
+async function insertStatusHistoryIfChanged(
+  tx: Tx,
+  userId: string,
+  game: GameRow,
+  newStatus: GameStatus,
+  notes: string,
+) {
+  if (game.status === newStatus) return;
+  await tx.insert(statusHistory).values({
+    userId,
+    gameId: game.id,
+    previousStatus: game.status,
+    newStatus,
+    notes,
+  });
 }
 
 async function findExistingGame(
@@ -922,6 +1066,14 @@ async function insertImportedGamesIntoQueue(tx: Tx, userId: string, importedIds:
   return queue.filter((item) => queuedCandidateIds.has(item.id) && item.queueRank != null).length;
 }
 
+async function compactQueueRanks(tx: Tx, userId: string) {
+  const queueRows = await tx.query.games.findMany({
+    where: and(eq(games.userId, userId), sql`${games.queueRank} is not null`),
+    orderBy: [asc(games.queueRank)],
+  });
+  await persistQueueRanks(tx, userId, rankQueueSequentially(queueRows.map(mapQueueCandidate)));
+}
+
 async function persistQueueRanks(tx: Tx, userId: string, queue: QueueCandidate[]) {
   const movable = queue.filter((item) => !item.queueLocked && item.queueRank != null);
   const now = new Date();
@@ -1024,6 +1176,9 @@ function mapSettings(row: typeof appSettings.$inferSelect): AppSettings {
     autoQueueNewImports: row.autoQueueNewImports,
     protectManualFieldsFromSync: row.protectManualFieldsFromSync,
     queueSlidingWindowSize: row.queueSlidingWindowSize,
+    rotationSkipCooldownDays: row.rotationSkipCooldownDays,
+    rotationSkipLimit: row.rotationSkipLimit,
+    parkedReassessmentDays: row.parkedReassessmentDays,
     slotWeights: row.slotWeights,
   };
 }
@@ -1042,6 +1197,9 @@ function settingsToDb(settings: Partial<AppSettings>) {
     autoQueueNewImports: settings.autoQueueNewImports,
     protectManualFieldsFromSync: settings.protectManualFieldsFromSync,
     queueSlidingWindowSize: settings.queueSlidingWindowSize,
+    rotationSkipCooldownDays: settings.rotationSkipCooldownDays,
+    rotationSkipLimit: settings.rotationSkipLimit,
+    parkedReassessmentDays: settings.parkedReassessmentDays,
     slotWeights: settings.slotWeights,
   };
 }
@@ -1074,6 +1232,11 @@ function mapGame(row: GameRow): Game {
     priorityScore: row.priorityScore,
     queueRank: row.queueRank,
     queueLocked: row.queueLocked,
+    rotationSkipCount: row.rotationSkipCount,
+    rotationSkipUntil: row.rotationSkipUntil,
+    rotationLastSkippedAt: row.rotationLastSkippedAt,
+    parkedForLater: row.parkedForLater,
+    reassessAfter: row.reassessAfter,
     status: row.status,
     installed: row.installed,
     currentRotation: row.currentRotation,
@@ -1110,6 +1273,11 @@ function mapGameSummary(row: GameRow): GameSummary {
     priorityScore: game.priorityScore,
     queueRank: game.queueRank,
     queueLocked: game.queueLocked,
+    rotationSkipCount: game.rotationSkipCount,
+    rotationSkipUntil: game.rotationSkipUntil,
+    rotationLastSkippedAt: game.rotationLastSkippedAt,
+    parkedForLater: game.parkedForLater,
+    reassessAfter: game.reassessAfter,
     personalInterest: game.personalInterest,
     playtimeMinutes: game.playtimeMinutes,
     achievementPercent: game.achievementPercent,
@@ -1162,5 +1330,6 @@ function mapQueueCandidate(row: GameRow): QueueCandidate {
     currentRotation: row.currentRotation,
     syncState: row.syncState,
     dateAdded: row.dateAdded,
+    parkedForLater: row.parkedForLater,
   };
 }

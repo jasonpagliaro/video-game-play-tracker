@@ -1,5 +1,7 @@
 import { GameTable } from "@/components/backlog/game-table";
 import { PageHeader } from "@/components/backlog/page-header";
+import { ParkedReassessmentPanel } from "@/components/rotation/parked-reassessment-panel";
+import { isParkedReassessmentDue } from "@/lib/backlog/rotation-fill";
 import { isDoneForNowCandidate, isOpenEndedCompletionType } from "@/lib/backlog/status";
 import { requireUser } from "@/lib/auth";
 import { getGames, getSettings } from "@/lib/db/repository";
@@ -24,7 +26,7 @@ export default async function OngoingPage() {
       isOpenEndedCompletionType(game.completionType),
   );
   const parked = activeHolding.filter(
-    (game) => !doneCandidateIds.has(game.id) && game.status === "parked",
+    (game) => !doneCandidateIds.has(game.id) && game.status === "parked" && !isParkedReassessmentDue(game),
   );
 
   return (
@@ -33,6 +35,7 @@ export default async function OngoingPage() {
         title="Ongoing & Parked"
         description="No-finish-line games, done-for-now candidates, and intentional not-now picks."
       />
+      <ParkedReassessmentPanel games={activeHolding} settings={settings} />
       {doneForNowCandidates.length > 0 ? (
         <section className="grid gap-2">
           <h2 className="text-base font-semibold tracking-normal">Ready to Mark Done for Now</h2>
