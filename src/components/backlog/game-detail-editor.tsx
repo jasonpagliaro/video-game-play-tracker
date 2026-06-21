@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Minus, Plus } from "lucide-react";
 
 import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
 import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
 import { StatusResolutionDialog, type StatusResolutionIntent } from "@/components/backlog/status-resolution-dialog";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,9 +27,9 @@ import {
   type GameStatus,
   type PersonalInterest,
 } from "@/lib/backlog/constants";
-import { isGameStatus, parseQueueRank, type GameVisibilitySnapshot } from "@/lib/backlog/autosave";
+import { isGameStatus, type GameVisibilitySnapshot } from "@/lib/backlog/autosave";
 import type { AppSettings, Game, GameSummary } from "@/lib/backlog/types";
-import { autoSaveGameFieldAction } from "@/server/actions/game-actions";
+import { autoSaveGameFieldAction, queueCommandAction } from "@/server/actions/game-actions";
 
 export function GameDetailEditor({
   game,
@@ -61,15 +63,6 @@ export function GameDetailEditor({
   const personalInterest = useAutoSaveField<PersonalInterest, GameVisibilitySnapshot>({
     initialValue: game.personalInterest,
     save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "personalInterest", value }),
-    onSaved,
-  });
-  const queueRank = useAutoSaveField<string, GameVisibilitySnapshot>({
-    initialValue: game.queueRank?.toString() ?? "",
-    save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "queueRank", value }),
-    validate: (value) => {
-      const parsed = parseQueueRank(value);
-      return parsed.ok ? null : parsed.message;
-    },
     onSaved,
   });
   const dnfReason = useAutoSaveField<string, GameVisibilitySnapshot>({
@@ -159,20 +152,7 @@ export function GameDetailEditor({
               onValueChange={(value) => personalInterest.setAndSave(value as PersonalInterest)}
               options={PERSONAL_INTERESTS.map((value) => ({ value, label: INTEREST_LABELS[value] }))}
             />
-            <div className="grid gap-2">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="queue-rank">Queue rank</Label>
-                <AutoSaveStatus status={queueRank.status} message={queueRank.message} />
-              </div>
-              <Input
-                id="queue-rank"
-                value={queueRank.value}
-                onChange={(event) => queueRank.setAndScheduleSave(event.target.value)}
-                onBlur={queueRank.flush}
-                placeholder="Lower numbers show sooner"
-                inputMode="numeric"
-              />
-            </div>
+            <QueueMembershipControl game={game} />
             <div className="grid gap-2 md:col-span-2">
               <div className="flex items-center justify-between gap-2">
                 <Label htmlFor="game-notes">Notes</Label>
@@ -237,5 +217,52 @@ function AutoSaveSelectField({
         </SelectContent>
       </Select>
     </div>
+  );
+}
+
+function QueueMembershipControl({ game }: { game: Game }) {
+  const queued = game.queueRank != null;
+  const eligible = canAddToQueue(game);
+  return (
+    <div className="grid gap-2">
+      <Label>Queue</Label>
+      <div className="flex min-h-9 items-center gap-2">
+        {queued ? (
+          <>
+            <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Queued</span>
+            <form action={queueCommandAction}>
+              <input type="hidden" name="gameId" value={game.id} />
+              <input type="hidden" name="command" value="remove_from_queue" />
+              <Button type="submit" size="sm" variant="outline" className="h-8 gap-1">
+                <Minus className="h-3.5 w-3.5" />
+                Remove
+              </Button>
+            </form>
+          </>
+        ) : (
+          <form action={queueCommandAction}>
+            <input type="hidden" name="gameId" value={game.id} />
+            <input type="hidden" name="command" value="add_to_queue" />
+            <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
+              <Plus className="h-3.5 w-3.5" />
+              Add to queue
+            </Button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function canAddToQueue(game: Game) {
+  return (
+    game.queueRank == null &&
+    !game.currentRotation &&
+    game.syncState !== "ignored" &&
+    game.status !== "completed" &&
+    game.status !== "done_for_now" &&
+    game.status !== "dnf" &&
+    game.status !== "parked" &&
+    game.status !== "wont_complete"
   );
 }

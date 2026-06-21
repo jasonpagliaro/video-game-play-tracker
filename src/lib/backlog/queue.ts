@@ -21,6 +21,31 @@ export const QUEUE_RULES = {
   releaseYearTieThreshold: 6,
 } as const;
 
+export const QUEUE_COMMANDS = [
+  "promote",
+  "demote",
+  "move_to_top",
+  "move_to_bottom",
+  "move_before",
+  "move_after",
+  "add_to_queue",
+  "remove_from_queue",
+] as const;
+
+export const QUEUE_SORT_PRESETS = [
+  "app_recommendation",
+  "highest_priority",
+  "highest_interest",
+  "shortest_estimated",
+  "least_recently_played",
+  "title",
+] as const;
+
+export type QueueCommand = (typeof QUEUE_COMMANDS)[number];
+export type QueueSortPreset = (typeof QUEUE_SORT_PRESETS)[number];
+
+type QueueMoveCommand = Exclude<QueueCommand, "add_to_queue" | "remove_from_queue">;
+
 type Distribution = {
   slots: Record<string, number>;
   completionTypes: Record<string, number>;
@@ -112,6 +137,99 @@ export function isQueueEligible(candidate: QueueCandidate) {
 
 export function filterQueueEligibleCandidates(candidates: QueueCandidate[]) {
   return candidates.filter(isQueueEligible);
+}
+
+export function isQueueCommand(value: string): value is QueueCommand {
+  return QUEUE_COMMANDS.includes(value as QueueCommand);
+}
+
+export function isQueueSortPreset(value: string): value is QueueSortPreset {
+  return QUEUE_SORT_PRESETS.includes(value as QueueSortPreset);
+}
+
+export function rankQueueSequentially(
+  queue: QueueCandidate[],
+  options: { rankStep?: number } = {},
+) {
+  const rankStep = options.rankStep ?? QUEUE_RULES.rankStep;
+  const locked = queue.filter((game) => game.queueLocked && game.queueRank != null);
+  const lockedByPosition = new Map<number, QueueCandidate>();
+  for (const game of locked) {
+    lockedByPosition.set(rankToIndex(game.queueRank ?? 0, rankStep), game);
+  }
+
+  const movable = queue.filter((game) => !game.queueLocked);
+  const maxLockedPosition = Math.max(-1, ...[...lockedByPosition.keys()]);
+  const slotCount = Math.max(queue.length, maxLockedPosition + 1);
+  const ranked: QueueCandidate[] = [];
+  let movableIndex = 0;
+
+  for (let index = 0; index < slotCount; index += 1) {
+    const lockedAtPosition = lockedByPosition.get(index);
+    if (lockedAtPosition) {
+      ranked.push(lockedAtPosition);
+      continue;
+    }
+    const next = movable[movableIndex];
+    if (!next) continue;
+    ranked.push({ ...next, queueRank: (index + 1) * rankStep });
+    movableIndex += 1;
+  }
+
+  let overflowIndex = slotCount;
+  while (movableIndex < movable.length) {
+    ranked.push({ ...movable[movableIndex], queueRank: (overflowIndex + 1) * rankStep });
+    movableIndex += 1;
+    overflowIndex += 1;
+  }
+
+  return ranked.sort((a, b) => (a.queueRank ?? Number.MAX_SAFE_INTEGER) - (b.queueRank ?? Number.MAX_SAFE_INTEGER));
+}
+
+export function reorderQueueByCommand(
+  queue: QueueCandidate[],
+  input: { gameId: string; command: QueueMoveCommand; targetGameId?: string },
+  options: { rankStep?: number } = {},
+) {
+  const ordered = normalizeQueued(queue);
+  const movable = ordered.filter((game) => !game.queueLocked);
+  const moving = movable.find((game) => game.id === input.gameId);
+  if (!moving) return rankQueueSequentially(ordered, options);
+
+  const nextMovable = movable.filter((game) => game.id !== input.gameId);
+  const currentIndex = movable.findIndex((game) => game.id === input.gameId);
+
+  if (input.command === "promote") {
+    nextMovable.splice(Math.max(0, currentIndex - 1), 0, moving);
+  } else if (input.command === "demote") {
+    nextMovable.splice(Math.min(nextMovable.length, currentIndex + 1), 0, moving);
+  } else if (input.command === "move_to_top") {
+    nextMovable.unshift(moving);
+  } else if (input.command === "move_to_bottom") {
+    nextMovable.push(moving);
+  } else {
+    const targetIndex = nextMovable.findIndex((game) => game.id === input.targetGameId);
+    if (targetIndex === -1) return rankQueueSequentially(ordered, options);
+    nextMovable.splice(input.command === "move_before" ? targetIndex : targetIndex + 1, 0, moving);
+  }
+
+  return rankQueueSequentially(rebuildQueueWithMovableOrder(ordered, nextMovable), options);
+}
+
+export function sortQueueByPreset(
+  queue: QueueCandidate[],
+  preset: QueueSortPreset,
+  options: { rankStep?: number; windowSize?: number } = {},
+) {
+  if (preset === "app_recommendation") return rebalanceQueue(queue, { windowSize: options.windowSize }).queue;
+
+  const ordered = normalizeQueued(queue);
+  const orderIndex = new Map(ordered.map((game, index) => [game.id, index]));
+  const movable = ordered
+    .filter((game) => !game.queueLocked)
+    .sort((a, b) => compareForSortPreset(a, b, preset, orderIndex));
+
+  return rankQueueSequentially(rebuildQueueWithMovableOrder(ordered, movable), options);
 }
 
 function rankToIndex(rank: number, rankStep: number) {
@@ -232,6 +350,65 @@ function compareDateAdded(a: QueueCandidate, b: QueueCandidate) {
 
 function dateAddedTime(value: QueueCandidate["dateAdded"]) {
   if (!value) return Number.MAX_SAFE_INTEGER;
+  const date = typeof value === "string" ? new Date(value) : value;
+  const time = date.getTime();
+  return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;
+}
+
+function normalizeQueued(queue: QueueCandidate[]) {
+  return queue
+    .filter((game) => game.queueRank != null)
+    .sort((a, b) => {
+      const rank = (a.queueRank ?? Number.MAX_SAFE_INTEGER) - (b.queueRank ?? Number.MAX_SAFE_INTEGER);
+      if (rank !== 0) return rank;
+      return a.title.localeCompare(b.title);
+    });
+}
+
+function rebuildQueueWithMovableOrder(ordered: QueueCandidate[], movable: QueueCandidate[]) {
+  const movableQueue = [...movable];
+  return ordered.map((game) => (game.queueLocked ? game : movableQueue.shift() ?? game));
+}
+
+function compareForSortPreset(
+  a: QueueCandidate,
+  b: QueueCandidate,
+  preset: Exclude<QueueSortPreset, "app_recommendation">,
+  orderIndex: Map<string, number>,
+) {
+  const stable = () => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0);
+  if (preset === "highest_priority") {
+    const priority = b.priorityScore - a.priorityScore;
+    return priority || stable();
+  }
+  if (preset === "highest_interest") {
+    const interest = interestRank(b.personalInterest) - interestRank(a.personalInterest);
+    return interest || b.priorityScore - a.priorityScore || stable();
+  }
+  if (preset === "shortest_estimated") {
+    const hours = estimatedHoursForSort(a) - estimatedHoursForSort(b);
+    return hours || stable();
+  }
+  if (preset === "least_recently_played") {
+    const played = lastPlayedTime(a.lastPlayed) - lastPlayedTime(b.lastPlayed);
+    return played || stable();
+  }
+  return a.title.localeCompare(b.title) || stable();
+}
+
+function interestRank(value: QueueCandidate["personalInterest"]) {
+  if (value === "high") return 3;
+  if (value === "medium") return 2;
+  if (value === "low") return 1;
+  return 0;
+}
+
+function estimatedHoursForSort(candidate: QueueCandidate) {
+  return candidate.estimatedHours ?? Number.MAX_SAFE_INTEGER;
+}
+
+function lastPlayedTime(value: QueueCandidate["lastPlayed"]) {
+  if (!value) return Number.MIN_SAFE_INTEGER;
   const date = typeof value === "string" ? new Date(value) : value;
   const time = date.getTime();
   return Number.isNaN(time) ? Number.MAX_SAFE_INTEGER : time;

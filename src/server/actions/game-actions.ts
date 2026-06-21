@@ -13,18 +13,20 @@ import {
   isCompletionType,
   isGameStatus,
   isPersonalInterest,
-  parseQueueRank,
   type AutoSaveGameFieldInput,
   type AutoSaveResult,
   type GameVisibilitySnapshot,
 } from "@/lib/backlog/autosave";
+import { isQueueCommand, isQueueSortPreset } from "@/lib/backlog/queue";
 import { requireUser } from "@/lib/auth";
 import {
+  applyQueueCommand,
   bulkUpdateGames,
   getGameVisibilitySnapshot,
   rebalanceUserQueue,
   setCurrentRotation,
   setInstalled,
+  sortUserQueue,
   updateGameFields,
   updateGameStatus,
 } from "@/lib/db/repository";
@@ -75,10 +77,6 @@ export async function autoSaveGameFieldAction(
     } else if (input.field === "personalInterest") {
       if (!isPersonalInterest(String(input.value))) return { ok: false, message: "Invalid interest." };
       await updateGameFields(user, input.gameId, { personalInterest: input.value });
-    } else if (input.field === "queueRank") {
-      const parsed = parseQueueRank(input.value);
-      if (!parsed.ok) return parsed;
-      await updateGameFields(user, input.gameId, { queueRank: parsed.value });
     } else if (input.field === "notes") {
       await updateGameFields(user, input.gameId, { notes: input.value.trim() ? input.value : null });
     } else if (input.field === "dnfReason") {
@@ -136,7 +134,6 @@ export async function toggleCurrentRotationAction(formData: FormData) {
 
 export async function updateGameFieldsAction(formData: FormData) {
   const user = await requireUser();
-  const queueRankText = String(formData.get("queueRank") ?? "").trim();
   await updateGameFields(user, String(formData.get("gameId")), {
     backlogSlot: formData.get("backlogSlot") ? (String(formData.get("backlogSlot")) as BacklogSlot) : undefined,
     completionType: formData.get("completionType")
@@ -145,20 +142,30 @@ export async function updateGameFieldsAction(formData: FormData) {
     personalInterest: formData.get("personalInterest")
       ? (String(formData.get("personalInterest")) as PersonalInterest)
       : undefined,
-    queueRank: queueRankText === "" ? null : Number(queueRankText),
     queueLocked: formData.get("queueLocked") ? String(formData.get("queueLocked")) === "true" : undefined,
     notes: formData.get("notes") ? String(formData.get("notes")) : undefined,
   });
   revalidateApp();
 }
 
-export async function moveQueueItemAction(formData: FormData) {
+export async function queueCommandAction(formData: FormData) {
   const user = await requireUser();
   const gameId = String(formData.get("gameId"));
-  const direction = String(formData.get("direction"));
-  const currentRank = Number(formData.get("currentRank"));
-  const nextRank = Math.max(1000, currentRank + (direction === "up" ? -1500 : 1500));
-  await updateGameFields(user, gameId, { queueRank: nextRank });
+  const command = String(formData.get("command"));
+  if (!isQueueCommand(command)) throw new Error("Invalid queue command.");
+  await applyQueueCommand(user, {
+    gameId,
+    command,
+    targetGameId: String(formData.get("targetGameId") ?? "") || undefined,
+  });
+  revalidateApp();
+}
+
+export async function sortQueueAction(formData: FormData) {
+  const user = await requireUser();
+  const preset = String(formData.get("preset"));
+  if (!isQueueSortPreset(preset)) throw new Error("Invalid queue sort.");
+  await sortUserQueue(user, preset);
   revalidateApp();
 }
 

@@ -22,7 +22,7 @@ export function DashboardQueueStatus({ summary }: { summary: DashboardSummary })
     {
       label: "Review imports",
       value: summary.queue.importedReview.toString(),
-      detail: "new imports without rank",
+      detail: "new imports unqueued",
       icon: SearchCheck,
     },
     {

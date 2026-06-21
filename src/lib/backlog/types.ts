@@ -157,6 +157,7 @@ export type QueueCandidate = Pick<
   playtimeMinutes?: number;
   steamReviewScore?: number | null;
   releaseYear?: number | null;
+  lastPlayed?: Date | string | null;
   status?: GameStatus;
   currentRotation?: boolean;
   syncState?: SyncState;

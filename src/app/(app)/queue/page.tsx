@@ -12,11 +12,10 @@ export default async function QueuePage() {
   const queued = games.filter((game) => game.queueRank != null).sort((a, b) => (a.queueRank ?? 0) - (b.queueRank ?? 0));
   return (
     <div className="grid gap-4 p-4 lg:p-6">
-      <PageHeader title="Next Up Queue" description="Ranked queue with category-aware balancing and manual rank control." />
+      <PageHeader title="Next Up Queue" description="Ranked queue with category-aware balancing and friendly move controls." />
       <WarningPanel warnings={summarizeWarnings(games, settings).filter((warning) => warning.code.includes("queue"))} />
       <QueueBalancePanel games={games} />
       <GameTable games={queued} settings={settings} view="queue" showQueueControls />
     </div>
   );
 }
-

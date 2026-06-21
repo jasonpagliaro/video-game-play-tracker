@@ -5,7 +5,6 @@ import {
   getGameDestination,
   parseOptionalPositiveInteger,
   parsePositiveInteger,
-  parseQueueRank,
   type GameVisibilitySnapshot,
 } from "@/lib/backlog/autosave";
 
@@ -32,21 +31,6 @@ const allFilters = {
 };
 
 describe("auto-save parsing", () => {
-  it("parses blank queue rank as unqueued", () => {
-    expect(parseQueueRank("")).toEqual({ ok: true, value: null });
-    expect(parseQueueRank("   ")).toEqual({ ok: true, value: null });
-  });
-
-  it("accepts positive whole-number queue ranks", () => {
-    expect(parseQueueRank("1200")).toEqual({ ok: true, value: 1200 });
-  });
-
-  it("rejects invalid queue ranks", () => {
-    expect(parseQueueRank("12.5").ok).toBe(false);
-    expect(parseQueueRank("abc").ok).toBe(false);
-    expect(parseQueueRank("0").ok).toBe(false);
-  });
-
   it("parses required and optional positive integer settings", () => {
     expect(parsePositiveInteger("5", "Max active rotation", 1)).toEqual({ ok: true, value: 5 });
     expect(parsePositiveInteger("", "Max active rotation", 1).ok).toBe(false);

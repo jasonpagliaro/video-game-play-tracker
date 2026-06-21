@@ -4,6 +4,9 @@ import {
   calculateCategoryDistribution,
   filterQueueEligibleCandidates,
   insertGamesWithCategoryBalance,
+  rankQueueSequentially,
+  reorderQueueByCommand,
+  sortQueueByPreset,
 } from "@/lib/backlog/queue";
 import type { QueueCandidate } from "@/lib/backlog/types";
 
@@ -23,8 +26,13 @@ function game(
     estimatedHours: null,
     queueLocked: false,
     queueRank: null,
+    lastPlayed: null,
     ...overrides,
   };
+}
+
+function queued(ids: string[]) {
+  return ids.map((id, index) => game(id, "action", 50, { queueRank: (index + 1) * 1000 }));
 }
 
 describe("queue balancing", () => {
@@ -94,5 +102,112 @@ describe("queue balancing", () => {
     );
 
     expect(queue.map((item) => item.id)).toEqual(["first", "second"]);
+  });
+
+  it("promotes, demotes, and moves queued games without accepting a raw rank", () => {
+    expect(reorderQueueByCommand(queued(["a", "b", "c"]), { gameId: "b", command: "promote" }).map((item) => item.id))
+      .toEqual(["b", "a", "c"]);
+    expect(reorderQueueByCommand(queued(["a", "b", "c"]), { gameId: "b", command: "demote" }).map((item) => item.id))
+      .toEqual(["a", "c", "b"]);
+    expect(reorderQueueByCommand(queued(["a", "b", "c"]), { gameId: "c", command: "move_to_top" }).map((item) => item.id))
+      .toEqual(["c", "a", "b"]);
+    expect(reorderQueueByCommand(queued(["a", "b", "c"]), { gameId: "a", command: "move_to_bottom" }).map((item) => item.id))
+      .toEqual(["b", "c", "a"]);
+  });
+
+  it("moves queued games before or after another queued game", () => {
+    expect(
+      reorderQueueByCommand(queued(["a", "b", "c", "d"]), {
+        gameId: "d",
+        command: "move_before",
+        targetGameId: "b",
+      }).map((item) => item.id),
+    ).toEqual(["a", "d", "b", "c"]);
+    expect(
+      reorderQueueByCommand(queued(["a", "b", "c", "d"]), {
+        gameId: "a",
+        command: "move_after",
+        targetGameId: "c",
+      }).map((item) => item.id),
+    ).toEqual(["b", "c", "a", "d"]);
+  });
+
+  it("recomputes stable internal ranks while preserving locked positions", () => {
+    const queue = [
+      game("a", "action", 50, { queueRank: 1000 }),
+      game("locked", "horror", 50, { queueLocked: true, queueRank: 2000 }),
+      game("b", "puzzle", 50, { queueRank: 3000 }),
+    ];
+
+    const ranked = rankQueueSequentially([queue[2], queue[0], queue[1]]);
+
+    expect(ranked.map((item) => [item.id, item.queueRank])).toEqual([
+      ["b", 1000],
+      ["locked", 2000],
+      ["a", 3000],
+    ]);
+  });
+
+  it("keeps locked items fixed while sorting movable queue items", () => {
+    const queue = [
+      game("low", "action", 10, { queueRank: 1000 }),
+      game("locked", "horror", 1, { queueLocked: true, queueRank: 2000 }),
+      game("high", "puzzle", 90, { queueRank: 3000 }),
+    ];
+
+    expect(sortQueueByPreset(queue, "highest_priority").map((item) => [item.id, item.queueRank])).toEqual([
+      ["high", 1000],
+      ["locked", 2000],
+      ["low", 3000],
+    ]);
+  });
+
+  it("sorts queue by each persistent preset deterministically", () => {
+    const queue = [
+      game("medium-long", "action", 30, {
+        personalInterest: "medium",
+        estimatedHours: 40,
+        lastPlayed: new Date("2024-01-01"),
+        queueRank: 1000,
+      }),
+      game("high-short-never", "puzzle", 80, {
+        personalInterest: "high",
+        estimatedHours: 6,
+        lastPlayed: null,
+        queueRank: 2000,
+      }),
+      game("low-short-old", "short", 95, {
+        personalInterest: "low",
+        estimatedHours: 4,
+        lastPlayed: new Date("2020-01-01"),
+        queueRank: 3000,
+      }),
+    ];
+
+    expect(sortQueueByPreset(queue, "highest_priority").map((item) => item.id)).toEqual([
+      "low-short-old",
+      "high-short-never",
+      "medium-long",
+    ]);
+    expect(sortQueueByPreset(queue, "highest_interest").map((item) => item.id)).toEqual([
+      "high-short-never",
+      "medium-long",
+      "low-short-old",
+    ]);
+    expect(sortQueueByPreset(queue, "shortest_estimated").map((item) => item.id)).toEqual([
+      "low-short-old",
+      "high-short-never",
+      "medium-long",
+    ]);
+    expect(sortQueueByPreset(queue, "least_recently_played").map((item) => item.id)).toEqual([
+      "high-short-never",
+      "low-short-old",
+      "medium-long",
+    ]);
+    expect(sortQueueByPreset(queue, "title").map((item) => item.id)).toEqual([
+      "high-short-never",
+      "low-short-old",
+      "medium-long",
+    ]);
   });
 });

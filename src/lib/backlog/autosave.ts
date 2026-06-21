@@ -61,7 +61,6 @@ export type AutoSaveGameFieldInput =
   | { gameId: string; field: "backlogSlot"; value: BacklogSlot }
   | { gameId: string; field: "completionType"; value: CompletionType }
   | { gameId: string; field: "personalInterest"; value: PersonalInterest }
-  | { gameId: string; field: "queueRank"; value: string }
   | { gameId: string; field: "notes"; value: string }
   | { gameId: string; field: "dnfReason"; value: string }
   | { gameId: string; field: "installed"; value: boolean }
@@ -102,19 +101,6 @@ export function isCompletionType(value: string): value is CompletionType {
 
 export function isPersonalInterest(value: string): value is PersonalInterest {
   return PERSONAL_INTERESTS.includes(value as PersonalInterest);
-}
-
-export function parseQueueRank(value: string): AutoSaveResult<number | null> {
-  const trimmed = value.trim();
-  if (!trimmed) return { ok: true, value: null };
-  const rank = Number(trimmed);
-  if (!Number.isFinite(rank) || !Number.isInteger(rank)) {
-    return { ok: false, message: "Queue rank must be a whole number." };
-  }
-  if (rank < 1) {
-    return { ok: false, message: "Queue rank must be greater than zero." };
-  }
-  return { ok: true, value: rank };
 }
 
 export function parsePositiveInteger(

@@ -23,7 +23,11 @@ import {
 import {
   filterQueueEligibleCandidates,
   insertGamesWithCategoryBalance,
+  reorderQueueByCommand,
   rebalanceQueue as rebalanceQueueLogic,
+  sortQueueByPreset,
+  type QueueCommand,
+  type QueueSortPreset,
 } from "@/lib/backlog/queue";
 import { parseSteamCsv } from "@/lib/backlog/csv";
 import { calculatePriorityScore, inferBacklogSlot, inferCompletionType } from "@/lib/backlog/inference";
@@ -41,6 +45,8 @@ type GameRow = typeof gamesTable.$inferSelect;
 type Tx = Parameters<Parameters<ReturnType<typeof import("./client").getDb>["transaction"]>[0]>[0];
 
 export type ImportDecision = "unqueued" | "queue" | "park" | "wont_complete" | "review";
+
+type QueueMoveCommand = Exclude<QueueCommand, "add_to_queue" | "remove_from_queue">;
 
 export type ImportApplyResult = {
   batchId: string | null;
@@ -231,7 +237,6 @@ export async function updateGameFields(
     backlogSlot: BacklogSlot;
     completionType: CompletionType;
     personalInterest: PersonalInterest;
-    queueRank: number | null;
     queueLocked: boolean;
     notes: string | null;
     dnfReason: string | null;
@@ -713,6 +718,85 @@ export async function rebalanceUserQueue(user: AppUser) {
   });
 }
 
+export async function applyQueueCommand(
+  user: AppUser,
+  input: { gameId: string; command: QueueCommand; targetGameId?: string },
+) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const target = await tx.query.games.findFirst({
+      where: and(eq(games.userId, user.id), eq(games.id, input.gameId)),
+    });
+    if (!target) throw new Error("Game not found.");
+
+    if (input.command === "remove_from_queue") {
+      await tx
+        .update(games)
+        .set({ queueRank: null, queueLocked: false, updatedAt: new Date() })
+        .where(and(eq(games.userId, user.id), eq(games.id, input.gameId)));
+      return;
+    }
+
+    if (input.command === "add_to_queue") {
+      if (target.queueRank != null) return;
+      const candidate = mapQueueCandidate(target);
+      if (!filterQueueEligibleCandidates([candidate]).length) {
+        throw new Error("This game is not eligible for the queue.");
+      }
+      const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, user.id) });
+      const existingQueue = (
+        await tx.query.games.findMany({
+          where: and(eq(games.userId, user.id), sql`${games.queueRank} is not null`),
+          orderBy: [asc(games.queueRank)],
+        })
+      ).map(mapQueueCandidate);
+      const { queue } = insertGamesWithCategoryBalance(existingQueue, [candidate], {
+        windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
+      });
+      await persistQueueRanks(tx, user.id, queue);
+      return;
+    }
+
+    if (target.queueRank == null) throw new Error("Only queued games can be moved.");
+    if (target.queueLocked) throw new Error("Locked queue items cannot be moved.");
+
+    const queueRows = await tx.query.games.findMany({
+      where: and(eq(games.userId, user.id), sql`${games.queueRank} is not null`),
+      orderBy: [asc(games.queueRank)],
+    });
+    if ((input.command === "move_before" || input.command === "move_after") && !input.targetGameId) {
+      throw new Error("Choose a target game first.");
+    }
+    if (input.targetGameId) {
+      const moveTarget = queueRows.find((game) => game.id === input.targetGameId);
+      if (!moveTarget) throw new Error("Target game is not queued.");
+      if (moveTarget.queueLocked) throw new Error("Choose an unlocked target game.");
+    }
+
+    const queue = reorderQueueByCommand(queueRows.map(mapQueueCandidate), {
+      gameId: input.gameId,
+      command: input.command as QueueMoveCommand,
+      targetGameId: input.targetGameId,
+    });
+    await persistQueueRanks(tx, user.id, queue);
+  });
+}
+
+export async function sortUserQueue(user: AppUser, preset: QueueSortPreset) {
+  if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
+  return withUserDb(user, async (tx) => {
+    const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, user.id) });
+    const queueRows = await tx.query.games.findMany({
+      where: and(eq(games.userId, user.id), sql`${games.queueRank} is not null`),
+      orderBy: [asc(games.queueRank)],
+    });
+    const queue = sortQueueByPreset(queueRows.map(mapQueueCandidate), preset, {
+      windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
+    });
+    await persistQueueRanks(tx, user.id, queue);
+  });
+}
+
 async function getActiveCount(tx: Tx, userId: string) {
   const result = await tx
     .select({ count: sql<number>`count(*)::int` })
@@ -1073,6 +1157,7 @@ function mapQueueCandidate(row: GameRow): QueueCandidate {
     playtimeMinutes: row.playtimeMinutes,
     steamReviewScore: row.steamReviewScore,
     releaseYear: row.releaseYear,
+    lastPlayed: row.lastPlayed,
     status: row.status,
     currentRotation: row.currentRotation,
     syncState: row.syncState,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useMemo, useState } from "react";
+import { Fragment, type ReactNode, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -11,7 +11,18 @@ import {
   getSortedRowModel,
   useReactTable,
 } from "@tanstack/react-table";
-import { ArrowDown, ArrowUp, MoreHorizontal, RotateCw, X } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ChevronsDown,
+  ChevronsUp,
+  ListOrdered,
+  Minus,
+  MoreHorizontal,
+  MoveVertical,
+  Plus,
+  X,
+} from "lucide-react";
 
 import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
 import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
@@ -25,8 +36,17 @@ import {
 import { StatusResolutionDialog, type StatusResolutionIntent } from "@/components/backlog/status-resolution-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -46,7 +66,6 @@ import {
   getGameDestination,
   ghostReasonForGame,
   isGameStatus,
-  parseQueueRank,
   type GameTableFilters,
   type GameTableView,
   type GameVisibilityScope,
@@ -56,9 +75,9 @@ import { formatDate, formatMinutes, formatPercent } from "@/lib/backlog/format";
 import type { AppSettings, GameSummary } from "@/lib/backlog/types";
 import {
   autoSaveGameFieldAction,
-  moveQueueItemAction,
-  rebalanceQueueAction,
   bulkUpdateGamesAction,
+  queueCommandAction,
+  sortQueueAction,
 } from "@/server/actions/game-actions";
 
 type GhostEntry = {
@@ -70,6 +89,19 @@ type GhostEntry = {
   destinationHref: string;
   destinationLabel: string;
 };
+
+type QueueMoveIntent = {
+  game: GameSummary;
+} | null;
+
+const QUEUE_SORT_OPTIONS = [
+  { value: "app_recommendation", label: "App recommendation" },
+  { value: "highest_priority", label: "Highest priority" },
+  { value: "highest_interest", label: "Highest interest" },
+  { value: "shortest_estimated", label: "Shortest estimated" },
+  { value: "least_recently_played", label: "Least recently played" },
+  { value: "title", label: "Title A-Z" },
+] as const;
 
 export function GameTable({
   games,
@@ -90,10 +122,26 @@ export function GameTable({
   const [slotFilter, setSlotFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [resolutionIntent, setResolutionIntent] = useState<StatusResolutionIntent>(null);
+  const [queueMoveIntent, setQueueMoveIntent] = useState<QueueMoveIntent>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [ghosts, setGhosts] = useState<GhostEntry[]>([]);
   const activeGames = games.filter((game) => game.currentRotation);
   const activeFull = activeGames.length >= settings.maxActiveRotationCount;
+  const queuedGames = useMemo(
+    () =>
+      games
+        .filter((game) => game.queueRank != null)
+        .sort((a, b) => (a.queueRank ?? Number.MAX_SAFE_INTEGER) - (b.queueRank ?? Number.MAX_SAFE_INTEGER)),
+    [games],
+  );
+  const movableQueuedGames = useMemo(
+    () => queuedGames.filter((game) => !game.queueLocked),
+    [queuedGames],
+  );
+  const queuePositions = useMemo(
+    () => new Map(queuedGames.map((game, index) => [game.id, index + 1])),
+    [queuedGames],
+  );
   const resolvedVisibilityScope = visibilityScope ?? getDefaultVisibilityScope(view, games);
   const filters = useMemo<GameTableFilters>(
     () => ({ statusFilter, slotFilter, typeFilter }),
@@ -221,11 +269,9 @@ export function GameTable({
         accessorKey: "queueRank",
         header: "Queue",
         cell: ({ row }) => (
-          <QueueRankAutoInput
-            key={`${row.original.id}-queue-${row.original.queueRank ?? "none"}`}
+          <QueueStatusControl
             game={row.original}
-            sourceIndex={row.index}
-            onSaved={handleSaved}
+            position={queuePositions.get(row.original.id) ?? null}
           />
         ),
       },
@@ -299,7 +345,7 @@ export function GameTable({
         ),
       },
     ],
-    [activeFull, handleSaved, selectedIds, settings],
+    [activeFull, handleSaved, queuePositions, selectedIds, settings],
   );
 
   // eslint-disable-next-line react-hooks/incompatible-library
@@ -369,10 +415,22 @@ export function GameTable({
           </Select>
         </div>
         {showQueueControls ? (
-          <form action={rebalanceQueueAction}>
+          <form action={sortQueueAction} className="flex flex-wrap items-center gap-2">
+            <Select name="preset" defaultValue="app_recommendation">
+              <SelectTrigger className="h-9 w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {QUEUE_SORT_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button size="sm" variant="outline" className="gap-2">
-              <RotateCw className="h-4 w-4" />
-              Rebalance queue
+              <ListOrdered className="h-4 w-4" />
+              Sort queue
             </Button>
           </form>
         ) : null}
@@ -496,24 +554,11 @@ export function GameTable({
                         ))}
                         {view === "queue" ? (
                           <TableCell className="py-2 align-top">
-                            <div className="flex gap-1">
-                              <form action={moveQueueItemAction}>
-                                <input type="hidden" name="gameId" value={row.original.id} />
-                                <input type="hidden" name="direction" value="up" />
-                                <input type="hidden" name="currentRank" value={row.original.queueRank ?? 1000} />
-                                <Button size="icon" variant="ghost" className="h-8 w-8">
-                                  <ArrowUp className="h-4 w-4" />
-                                </Button>
-                              </form>
-                              <form action={moveQueueItemAction}>
-                                <input type="hidden" name="gameId" value={row.original.id} />
-                                <input type="hidden" name="direction" value="down" />
-                                <input type="hidden" name="currentRank" value={row.original.queueRank ?? 1000} />
-                                <Button size="icon" variant="ghost" className="h-8 w-8">
-                                  <ArrowDown className="h-4 w-4" />
-                                </Button>
-                              </form>
-                            </div>
+                            <QueueMoveControls
+                              game={row.original}
+                              movableGames={movableQueuedGames}
+                              onMovePrecise={setQueueMoveIntent}
+                            />
                           </TableCell>
                         ) : null}
                       </TableRow>
@@ -547,6 +592,13 @@ export function GameTable({
           if (!open) setResolutionIntent(null);
         }}
         onSaved={(intent, snapshot) => handleSaved(intent.game, intent.sourceIndex, snapshot)}
+      />
+      <QueueMoveDialog
+        intent={queueMoveIntent}
+        queuedGames={movableQueuedGames}
+        onOpenChange={(open) => {
+          if (!open) setQueueMoveIntent(null);
+        }}
       />
     </div>
   );
@@ -610,36 +662,209 @@ function GameStatusAutoSelect({
   );
 }
 
-function QueueRankAutoInput({
-  game,
-  sourceIndex,
-  onSaved,
-}: {
-  game: GameSummary;
-  sourceIndex: number;
-  onSaved: (game: Pick<GameSummary, "id" | "title">, sourceIndex: number, snapshot: GameVisibilitySnapshot) => void;
-}) {
-  const field = useAutoSaveField<string, GameVisibilitySnapshot>({
-    initialValue: game.queueRank?.toString() ?? "",
-    save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "queueRank", value }),
-    validate: (value) => {
-      const parsed = parseQueueRank(value);
-      return parsed.ok ? null : parsed.message;
-    },
-    onSaved: (snapshot) => onSaved(game, sourceIndex, snapshot),
-  });
+function QueueStatusControl({ game, position }: { game: GameSummary; position: number | null }) {
+  if (game.queueRank == null) {
+    const eligible = canAddToQueue(game);
+    return (
+      <form action={queueCommandAction} className="min-w-32">
+        <input type="hidden" name="gameId" value={game.id} />
+        <input type="hidden" name="command" value="add_to_queue" />
+        <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
+          <Plus className="h-3.5 w-3.5" />
+          Queue
+        </Button>
+      </form>
+    );
+  }
 
   return (
-    <div className="grid min-w-32 gap-1">
-      <Input
-        value={field.value}
-        onChange={(event) => field.setAndScheduleSave(event.target.value)}
-        onBlur={field.flush}
-        className="h-8 w-20 font-mono text-xs"
-        inputMode="numeric"
-      />
-      <AutoSaveStatus status={field.status} message={field.message} />
+    <div className="flex min-w-32 items-center gap-2">
+      <span className="rounded-md border border-border px-2 py-1 font-mono text-xs">
+        {position === 1 ? "Next" : position ? `#${position}` : "Queued"}
+      </span>
+      <form action={queueCommandAction}>
+        <input type="hidden" name="gameId" value={game.id} />
+        <input type="hidden" name="command" value="remove_from_queue" />
+        <Button type="submit" size="icon" variant="ghost" className="h-8 w-8" title="Remove from queue">
+          <Minus className="h-4 w-4" />
+        </Button>
+      </form>
     </div>
+  );
+}
+
+function QueueMoveControls({
+  game,
+  movableGames,
+  onMovePrecise,
+}: {
+  game: GameSummary;
+  movableGames: GameSummary[];
+  onMovePrecise: (intent: QueueMoveIntent) => void;
+}) {
+  const movableIndex = movableGames.findIndex((item) => item.id === game.id);
+  const disabled = game.queueLocked || movableIndex === -1;
+  const isFirst = movableIndex <= 0;
+  const isLast = movableIndex === movableGames.length - 1;
+
+  return (
+    <div className="flex gap-1">
+      <QueueCommandButton
+        gameId={game.id}
+        command="move_to_top"
+        title="Move to top"
+        disabled={disabled || isFirst}
+      >
+        <ChevronsUp className="h-4 w-4" />
+      </QueueCommandButton>
+      <QueueCommandButton
+        gameId={game.id}
+        command="promote"
+        title="Promote"
+        disabled={disabled || isFirst}
+      >
+        <ArrowUp className="h-4 w-4" />
+      </QueueCommandButton>
+      <QueueCommandButton
+        gameId={game.id}
+        command="demote"
+        title="Demote"
+        disabled={disabled || isLast}
+      >
+        <ArrowDown className="h-4 w-4" />
+      </QueueCommandButton>
+      <QueueCommandButton
+        gameId={game.id}
+        command="move_to_bottom"
+        title="Move to bottom"
+        disabled={disabled || isLast}
+      >
+        <ChevronsDown className="h-4 w-4" />
+      </QueueCommandButton>
+      <Button
+        type="button"
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8"
+        title="Move before or after"
+        disabled={disabled || movableGames.length < 2}
+        onClick={() => onMovePrecise({ game })}
+      >
+        <MoveVertical className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+function QueueCommandButton({
+  gameId,
+  command,
+  title,
+  disabled,
+  children,
+}: {
+  gameId: string;
+  command: string;
+  title: string;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <form action={queueCommandAction}>
+      <input type="hidden" name="gameId" value={gameId} />
+      <input type="hidden" name="command" value={command} />
+      <Button type="submit" size="icon" variant="ghost" className="h-8 w-8" title={title} disabled={disabled}>
+        {children}
+      </Button>
+    </form>
+  );
+}
+
+function QueueMoveDialog({
+  intent,
+  queuedGames,
+  onOpenChange,
+}: {
+  intent: QueueMoveIntent;
+  queuedGames: GameSummary[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  const targets = useMemo(
+    () => queuedGames.filter((game) => game.id !== intent?.game.id),
+    [intent?.game.id, queuedGames],
+  );
+  const [command, setCommand] = useState<"move_before" | "move_after">("move_before");
+  const [targetGameId, setTargetGameId] = useState("");
+  const selectedTargetGameId = targets.some((game) => game.id === targetGameId)
+    ? targetGameId
+    : targets[0]?.id ?? "";
+
+  return (
+    <Dialog open={Boolean(intent)} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Move queued game</DialogTitle>
+          <DialogDescription>
+            Place {intent?.game.title ?? "this game"} before or after another queued game.
+          </DialogDescription>
+        </DialogHeader>
+        {intent ? (
+          <form action={queueCommandAction} className="grid gap-4" onSubmit={() => onOpenChange(false)}>
+            <input type="hidden" name="gameId" value={intent.game.id} />
+            <input type="hidden" name="command" value={command} />
+            <input type="hidden" name="targetGameId" value={selectedTargetGameId} />
+            <div className="grid gap-2">
+              <Label htmlFor="queue-move-placement">Placement</Label>
+              <Select value={command} onValueChange={(value) => setCommand(value as "move_before" | "move_after")}>
+                <SelectTrigger id="queue-move-placement">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="move_before">Before</SelectItem>
+                  <SelectItem value="move_after">After</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="queue-move-target">Target game</Label>
+              <Select value={selectedTargetGameId} onValueChange={setTargetGameId}>
+                <SelectTrigger id="queue-move-target">
+                  <SelectValue placeholder="Choose queued game" />
+                </SelectTrigger>
+                <SelectContent>
+                  {targets.map((game) => (
+                    <SelectItem key={game.id} value={game.id}>
+                      {game.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!selectedTargetGameId}>
+                Move
+              </Button>
+            </DialogFooter>
+          </form>
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function canAddToQueue(game: GameSummary) {
+  return (
+    game.queueRank == null &&
+    !game.currentRotation &&
+    game.syncState !== "ignored" &&
+    game.status !== "completed" &&
+    game.status !== "done_for_now" &&
+    game.status !== "dnf" &&
+    game.status !== "parked" &&
+    game.status !== "wont_complete"
   );
 }
 
