@@ -1,7 +1,7 @@
 import {
   type BacklogSlot,
   type CompletionType,
-  PARKING_COMPLETION_TYPES,
+  OPEN_ENDED_COMPLETION_TYPES,
 } from "./constants";
 import { normalizeTitle } from "./normalize";
 
@@ -13,20 +13,72 @@ const liveServiceTerms = [
   "battle pass",
   "battlepass",
   "extraction shooter",
+  "in-app purchases",
   "persistent online",
   "seasonal",
   "season pass",
 ];
-const sandboxTerms = ["sandbox", "survival", "craft", "builder", "simulation", "sim"];
-const multiplayerTerms = ["multiplayer", "co-op", "coop", "competitive", "pvp"];
+const sandboxTerms = [
+  "sandbox",
+  "survival",
+  "craft",
+  "crafting",
+  "base building",
+  "builder",
+  "life sim",
+  "simulation",
+  "sim",
+];
+const multiplayerTerms = [
+  "multiplayer",
+  "multi-player",
+  "co-op",
+  "coop",
+  "cooperative",
+  "online co-op",
+  "lan co-op",
+  "shared/split screen",
+  "competitive",
+  "pvp",
+  "player vs player",
+];
 const roguelikeTerms = ["roguelike", "roguelite", "rogue-lite", "rogue-like"];
 const endlessTerms = ["endless", "open-ended", "open ended", "score attack", "idle", "incremental"];
 const horrorTerms = ["horror", "survival horror"];
-const puzzleTerms = ["puzzle", "logic", "hidden object", "point and click"];
-const strategyTerms = ["strategy", "builder", "city builder", "4x", "management", "tactics"];
+const puzzleTerms = ["puzzle", "logic", "hidden object", "point and click", "point & click"];
+const strategyTerms = [
+  "strategy",
+  "builder",
+  "city builder",
+  "colony sim",
+  "4x",
+  "management",
+  "tactics",
+  "tactical",
+  "deckbuilder",
+  "deck-building",
+  "card battler",
+  "card game",
+];
 const rpgTerms = ["rpg", "role-playing", "open world", "jrpg", "crpg"];
-const narrativeTerms = ["story", "narrative", "visual novel", "adventure"];
-const actionTerms = ["action", "combat", "shooter", "immersive sim", "souls"];
+const narrativeTerms = ["story", "narrative", "visual novel", "interactive fiction", "adventure"];
+const actionTerms = [
+  "action",
+  "combat",
+  "shooter",
+  "immersive sim",
+  "souls",
+  "souls-like",
+  "platformer",
+  "metroidvania",
+  "fighting",
+  "racing",
+  "sports",
+  "arcade",
+  "beat 'em up",
+  "hack and slash",
+];
+const coopTerms = ["co-op", "coop", "cooperative", "online co-op", "lan co-op", "shared/split screen"];
 
 const knownCompletionTypeOverrides: Record<string, CompletionType> = {
   [normalizeTitle("Arc Raiders")]: "live_service",
@@ -65,8 +117,7 @@ export function inferCompletionType(input: {
       ...narrativeTerms,
       ...actionTerms,
       ...rpgTerms,
-      "platformer",
-      "metroidvania",
+      ...strategyTerms,
     ])
   ) {
     return "completable";
@@ -83,16 +134,17 @@ export function inferBacklogSlot(input: {
 }): BacklogSlot {
   const text = haystack(input.title, input.tags, input.genres);
   const completionType = input.completionType ?? inferCompletionType(input);
-  if (PARKING_COMPLETION_TYPES.includes(completionType)) return "parking_lot";
   if (includesAny(text, horrorTerms)) return "horror";
   if (includesAny(text, puzzleTerms)) return "puzzle";
   if (includesAny(text, strategyTerms)) return "strategy";
   if (includesAny(text, rpgTerms)) return "rpg_long";
   if (includesAny(text, narrativeTerms)) return "narrative";
   if (includesAny(text, actionTerms)) return "action";
+  if (includesAny(text, coopTerms)) return "coop";
   if ((input.playtimeMinutes ?? 0) > 0 && (input.playtimeMinutes ?? 0) < 180) {
     return "short";
   }
+  if (OPEN_ENDED_COMPLETION_TYPES.includes(completionType)) return "parking_lot";
   return completionType === "unknown" ? "experimental" : "short";
 }
 

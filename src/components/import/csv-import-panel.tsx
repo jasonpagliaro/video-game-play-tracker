@@ -149,8 +149,8 @@ export function CsvImportPanel({ defaultDecision = "review" }: { defaultDecision
                       <TableHead>Title</TableHead>
                       <TableHead>App</TableHead>
                       <TableHead>Playtime</TableHead>
-                      <TableHead>Slot</TableHead>
-                      <TableHead>Type</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Finish style</TableHead>
                       <TableHead>Priority</TableHead>
                     </TableRow>
                   </TableHeader>

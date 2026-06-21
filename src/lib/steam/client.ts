@@ -6,8 +6,17 @@ import {
   type SteamAccountProfile,
   type SteamLibraryPreview,
 } from "./library";
+import {
+  isRecord,
+  normalizeSteamStoreAppMetadata,
+  STORE_APPDETAILS_FILTERS,
+  type SteamStoreMetadata,
+  type SteamStoreMetadataFetchResult,
+} from "./metadata";
 
 const STEAM_API_BASE = "https://api.steampowered.com";
+const STEAM_STORE_API_BASE = "https://store.steampowered.com";
+const STORE_APPDETAILS_CHUNK_SIZE = 50;
 
 type ResolveVanityResponse = {
   response?: {
@@ -36,19 +45,56 @@ type OwnedGamesResponse = {
 
 export async function fetchSteamLibraryPreview(
   identifier: string,
-  options: { sampleLimit?: number } = {},
+  options: { sampleLimit?: number; enrichMetadata?: boolean } = {},
 ): Promise<SteamLibraryPreview> {
   const parsed = parseSteamIdentifier(identifier);
   const steamid64 = parsed.kind === "steamid64" ? parsed.steamid64 : await resolveVanityUrl(parsed.vanity);
   const account = await fetchPlayerSummary(steamid64);
   const games = await fetchOwnedGames(steamid64);
+  const metadata =
+    options.enrichMetadata === false
+      ? { metadataByAppId: new Map(), failedAppIds: new Set<number>() }
+      : await fetchSteamStoreMetadataForAppIds(games.map((game) => Number(game.appid)));
 
   return buildSteamLibraryPreview({
     identifier,
     account,
     games,
+    storeMetadataByAppId: metadata.metadataByAppId,
+    metadataFailedAppIds: metadata.failedAppIds,
     sampleLimit: options.sampleLimit,
   });
+}
+
+export async function fetchSteamStoreMetadataForAppIds(appIds: number[]): Promise<SteamStoreMetadataFetchResult> {
+  const validAppIds = [
+    ...new Set(appIds.filter((appId) => Number.isInteger(appId) && appId > 0).map((appId) => Math.trunc(appId))),
+  ];
+  const metadataByAppId = new Map<number, SteamStoreMetadata>();
+  const failedAppIds = new Set<number>();
+
+  for (let index = 0; index < validAppIds.length; index += STORE_APPDETAILS_CHUNK_SIZE) {
+    const chunk = validAppIds.slice(index, index + STORE_APPDETAILS_CHUNK_SIZE);
+    try {
+      const json = await fetchStoreAppDetails(chunk);
+      for (const appId of chunk) {
+        const entry = json[String(appId)];
+        const data = isRecord(entry) && entry.success === true ? entry.data : null;
+        const metadata = normalizeSteamStoreAppMetadata(data);
+        if (metadata) {
+          metadataByAppId.set(appId, metadata);
+        } else {
+          failedAppIds.add(appId);
+        }
+      }
+    } catch {
+      for (const appId of chunk) {
+        failedAppIds.add(appId);
+      }
+    }
+  }
+
+  return { metadataByAppId, failedAppIds };
 }
 
 async function resolveVanityUrl(vanity: string) {
@@ -81,6 +127,18 @@ async function fetchOwnedGames(steamid64: string) {
     include_played_free_games: "true",
   });
   return json.response?.games ?? [];
+}
+
+async function fetchStoreAppDetails(appIds: number[]) {
+  const url = new URL("/api/appdetails", STEAM_STORE_API_BASE);
+  url.searchParams.set("appids", appIds.join(","));
+  url.searchParams.set("filters", STORE_APPDETAILS_FILTERS);
+
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Steam Store metadata request failed with HTTP ${response.status}.`);
+  }
+  return (await response.json()) as Record<string, unknown>;
 }
 
 async function steamGetJson<T>(path: string, params: Record<string, string>) {

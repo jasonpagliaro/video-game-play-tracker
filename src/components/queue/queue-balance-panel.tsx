@@ -12,11 +12,11 @@ export function QueueBalancePanel({ games }: { games: GameSummary[] }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Category distribution</CardTitle>
+        <CardTitle className="text-base">Category mix</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-4 lg:grid-cols-2">
         <div>
-          <div className="mb-2 text-xs font-medium text-muted-foreground">Slots</div>
+          <div className="mb-2 text-xs font-medium text-muted-foreground">Categories</div>
           <div className="grid gap-2">
             {slotEntries.length ? (
               slotEntries.map(([slot, count]) => (
@@ -28,7 +28,7 @@ export function QueueBalancePanel({ games }: { games: GameSummary[] }) {
           </div>
         </div>
         <div>
-          <div className="mb-2 text-xs font-medium text-muted-foreground">Completion types</div>
+          <div className="mb-2 text-xs font-medium text-muted-foreground">Finish styles</div>
           <div className="grid gap-2">
             {typeEntries.length ? (
               typeEntries.map(([type, count]) => (
@@ -66,4 +66,3 @@ function BalanceRow({ label, count, total }: { label: string; count: number; tot
     </div>
   );
 }
-

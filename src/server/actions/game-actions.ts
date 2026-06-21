@@ -26,6 +26,7 @@ function revalidateApp() {
   revalidatePath("/completed");
   revalidatePath("/dnf");
   revalidatePath("/parking-lot");
+  revalidatePath("/ongoing");
 }
 
 export async function updateGameStatusAction(formData: FormData) {

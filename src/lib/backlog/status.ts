@@ -1,5 +1,5 @@
 import {
-  PARKING_COMPLETION_TYPES,
+  OPEN_ENDED_COMPLETION_TYPES,
   type CompletionType,
   type GameStatus,
 } from "./constants";
@@ -27,7 +27,7 @@ export function isDoneForNowCandidate(
 }
 
 export function isOpenEndedCompletionType(completionType: CompletionType) {
-  return PARKING_COMPLETION_TYPES.includes(completionType);
+  return OPEN_ENDED_COMPLETION_TYPES.includes(completionType);
 }
 
 export type StatusTransitionInput = {

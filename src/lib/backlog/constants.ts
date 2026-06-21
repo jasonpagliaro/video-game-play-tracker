@@ -79,8 +79,8 @@ export const SLOT_LABELS: Record<BacklogSlot, string> = {
   rpg_long: "RPG / Long",
   strategy: "Strategy / Builder",
   coop: "Co-op / Multiplayer",
-  experimental: "Experimental",
-  parking_lot: "Parking Lot",
+  experimental: "Needs Review",
+  parking_lot: "Ongoing / Open-Ended",
 };
 
 export const COMPLETION_TYPE_LABELS: Record<CompletionType, string> = {
@@ -90,7 +90,7 @@ export const COMPLETION_TYPE_LABELS: Record<CompletionType, string> = {
   multiplayer: "Multiplayer",
   live_service: "Live Service",
   roguelike: "Roguelike",
-  unknown: "Unknown",
+  unknown: "Needs Type",
 };
 
 export const INTEREST_LABELS: Record<PersonalInterest, string> = {
@@ -108,13 +108,15 @@ export const SYNC_STATE_LABELS: Record<SyncState, string> = {
   ignored: "Ignored",
 };
 
-export const PARKING_COMPLETION_TYPES: CompletionType[] = [
+export const OPEN_ENDED_COMPLETION_TYPES: CompletionType[] = [
   "endless",
   "sandbox",
   "multiplayer",
   "live_service",
   "roguelike",
 ];
+
+export const PARKING_COMPLETION_TYPES = OPEN_ENDED_COMPLETION_TYPES;
 
 export const DEFAULT_ACTIVE_ROTATION_COUNT = 5;
 export const DEFAULT_CHECKIN_INTERVAL_DAYS = 7;

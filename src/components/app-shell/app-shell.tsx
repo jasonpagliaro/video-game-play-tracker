@@ -25,7 +25,7 @@ const navItems = [
   { href: "/queue", label: "Next Up", icon: ListOrdered },
   { href: "/completed", label: "Completed", icon: CheckCircle2 },
   { href: "/dnf", label: "DNF / Won't", icon: CircleSlash },
-  { href: "/parking-lot", label: "Parking Lot", icon: ParkingCircle },
+  { href: "/ongoing", label: "Ongoing", icon: ParkingCircle },
   { href: "/import", label: "Import", icon: Upload },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
@@ -93,4 +93,3 @@ export function AppShell({ children, user }: { children: React.ReactNode; user: 
     </div>
   );
 }
-

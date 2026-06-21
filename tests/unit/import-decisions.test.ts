@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildReclassificationPatch,
   resolveSyncedClassification,
   statusForImportDecision,
 } from "@/lib/db/repository";
@@ -12,6 +13,14 @@ describe("import decisions", () => {
     expect(statusForImportDecision("unqueued", openEnded)).toBe("parked");
     expect(statusForImportDecision("review", openEnded)).toBe("parked");
     expect(statusForImportDecision("queue", openEnded)).toBe("not_started");
+  });
+
+  it("parks open-ended imports by default even when they have a concrete backlog category", () => {
+    const openEndedAction = { completionType: "live_service" as const, backlogSlot: "action" as const };
+
+    expect(statusForImportDecision("unqueued", openEndedAction)).toBe("parked");
+    expect(statusForImportDecision("review", openEndedAction)).toBe("parked");
+    expect(statusForImportDecision("queue", openEndedAction)).toBe("not_started");
   });
 
   it("keeps completable imports unqueued by default", () => {
@@ -46,5 +55,39 @@ describe("import decisions", () => {
         { backlogSlot: "parking_lot", completionType: "live_service" },
       ),
     ).toEqual({ backlogSlot: "parking_lot", completionType: "live_service" });
+  });
+
+  it("preserves manual category/type overrides during reclassification", () => {
+    const patch = buildReclassificationPatch(
+      {
+        title: "Manual Sandbox",
+        genres: null,
+        tags: null,
+        playtimeMinutes: 600,
+        personalInterest: "high",
+        estimatedHours: null,
+        steamReviewScore: null,
+        backlogSlot: "action",
+        completionType: "completable",
+        manualBacklogSlot: true,
+        manualCompletionType: true,
+        rawImportMetadata: null,
+      } as Parameters<typeof buildReclassificationPatch>[0],
+      {
+        genres: ["Simulation"],
+        tags: ["Online Co-op"],
+        releaseYear: 2016,
+        steamReviewScore: 89,
+        raw: { steam_appid: 413150 },
+      },
+    );
+
+    expect(patch.backlogSlot).toBe("action");
+    expect(patch.completionType).toBe("completable");
+    expect(patch.genres).toEqual(["Simulation"]);
+    expect(patch.tags).toEqual(["Online Co-op"]);
+    expect(patch.releaseYear).toBe(2016);
+    expect(patch.steamReviewScore).toBe(89);
+    expect(patch.rawImportMetadata).toEqual({ store: { steam_appid: 413150 } });
   });
 });

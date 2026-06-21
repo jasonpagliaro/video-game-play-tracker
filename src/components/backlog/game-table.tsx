@@ -68,7 +68,7 @@ export function GameTable({
 }: {
   games: GameSummary[];
   settings: AppSettings;
-  view?: "all" | "queue" | "rotation" | "completed" | "dnf" | "parking";
+  view?: "all" | "queue" | "rotation" | "completed" | "dnf" | "ongoing";
   showQueueControls?: boolean;
 }) {
   const [globalFilter, setGlobalFilter] = useState("");
@@ -305,10 +305,10 @@ export function GameTable({
           </Select>
           <Select value={slotFilter} onValueChange={setSlotFilter}>
             <SelectTrigger className="h-9 w-48">
-              <SelectValue placeholder="Slot" />
+              <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All slots</SelectItem>
+              <SelectItem value="all">All categories</SelectItem>
               {BACKLOG_SLOTS.map((slot) => (
                 <SelectItem key={slot} value={slot}>
                   {SLOT_LABELS[slot]}
@@ -318,10 +318,10 @@ export function GameTable({
           </Select>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="h-9 w-44">
-              <SelectValue placeholder="Type" />
+              <SelectValue placeholder="Finish style" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
+              <SelectItem value="all">All finish styles</SelectItem>
               {COMPLETION_TYPES.map((type) => (
                 <SelectItem key={type} value={type}>
                   {COMPLETION_TYPE_LABELS[type]}
@@ -351,8 +351,8 @@ export function GameTable({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="set_status">Set status</SelectItem>
-              <SelectItem value="set_slot">Set slot</SelectItem>
-              <SelectItem value="set_completion_type">Set type</SelectItem>
+              <SelectItem value="set_slot">Set category</SelectItem>
+              <SelectItem value="set_completion_type">Set finish style</SelectItem>
               <SelectItem value="set_interest">Set interest</SelectItem>
               <SelectItem value="park">Park selected</SelectItem>
               <SelectItem value="wont_complete">Won&apos;t Complete</SelectItem>
@@ -360,6 +360,7 @@ export function GameTable({
               <SelectItem value="remove_rotation">Remove active</SelectItem>
               <SelectItem value="mark_ignored">Mark ignored</SelectItem>
               <SelectItem value="recalculate_priority">Recalc priority</SelectItem>
+              <SelectItem value="reclassify">Reclassify selected</SelectItem>
               <SelectItem value="rebalance_selected">Rebalance selected</SelectItem>
             </SelectContent>
           </Select>

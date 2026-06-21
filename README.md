@@ -42,7 +42,8 @@ npm run db:migrate
 - `/queue`
 - `/completed`
 - `/dnf`
-- `/parking-lot`
+- `/ongoing`
+- `/parking-lot` redirects to `/ongoing`
 - `/import`
 - `/settings`
 - `/games/[id]`
@@ -59,13 +60,13 @@ The importer supports flexible column names and maps the discovered Steam export
 - `release_date` -> release year
 - review score columns into Steam review metadata
 
-Imports upsert by Steam app id when present, otherwise normalized title. Manual status, notes, DNF decisions, queue position, and manually edited slot/type decisions are preserved on update.
+Imports upsert by Steam app id when present, otherwise normalized title. Manual status, notes, DNF decisions, queue position, and manually edited category/finish-style decisions are preserved on update.
 
 ## Steam Library Sync
 
 The Steam sync accepts a SteamID64, `steamcommunity.com/profiles/:id` URL, `steamcommunity.com/id/:vanity` URL, SteamID2, SteamID3, or raw vanity name. It uses `STEAM_API_KEY` server-side to resolve vanity profiles, read the player summary, and pull owned games.
 
-This sync imports library-level data only: app id, title, total and platform playtime, last played, owner SteamID64, and sync timestamps. It does not call Store appdetails, fetch release dates, fetch achievements, or use AI. Release-order queue tie breaks only use release years already present from CSV/manual data.
+This sync imports library-level data plus best-effort Steam Store metadata: app id, title, total and platform playtime, last played, owner SteamID64, Store genres/categories, release year, review score, and sync timestamps. Store metadata failures do not block library sync, and the app does not use AI.
 
 Steam libraries must be visible to the API. Empty/private-library results are safe: applying one will not mark existing owned games as missing from the latest sync.
 

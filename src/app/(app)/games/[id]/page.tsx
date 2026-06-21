@@ -84,7 +84,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
             <form action={updateGameFieldsAction} className="grid gap-3 md:grid-cols-2">
               <input type="hidden" name="gameId" value={game.id} />
               <div className="grid gap-2">
-                <Label htmlFor="backlog-slot">Backlog slot</Label>
+                <Label htmlFor="backlog-slot">Backlog category</Label>
                 <Select name="backlogSlot" defaultValue={game.backlogSlot}>
                   <SelectTrigger id="backlog-slot" className="w-full">
                     <SelectValue />
@@ -99,7 +99,7 @@ export default async function GameDetailPage({ params }: { params: Promise<{ id:
                 </Select>
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="completion-type">Completion type</Label>
+                <Label htmlFor="completion-type">Finish style</Label>
                 <Select name="completionType" defaultValue={game.completionType}>
                   <SelectTrigger id="completion-type" className="w-full">
                     <SelectValue />

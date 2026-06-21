@@ -1,9 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { parseSteamIdentifier } from "@/lib/steam/identifier";
 import { buildSteamLibraryPreview, normalizeSteamOwnedGame } from "@/lib/steam/library";
+import { fetchSteamStoreMetadataForAppIds } from "@/lib/steam/client";
+import { normalizeSteamStoreAppMetadata } from "@/lib/steam/metadata";
 
 const steamid64 = "76561197960287930";
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("Steam identifier parsing", () => {
   it("accepts a SteamID64", () => {
@@ -109,6 +115,8 @@ describe("Steam library normalization", () => {
     expect(preview.privateOrEmpty).toBe(true);
     expect(preview.validCount).toBe(0);
     expect(preview.skippedCount).toBe(0);
+    expect(preview.metadataEnrichedCount).toBe(0);
+    expect(preview.metadataFailedCount).toBe(0);
     expect(preview.rows).toEqual([]);
   });
 
@@ -128,5 +136,87 @@ describe("Steam library normalization", () => {
     expect(preview.validCount).toBe(1);
     expect(preview.skippedCount).toBe(1);
     expect(preview.rows[1]?.valid).toBe(false);
+  });
+
+  it("enriches owned games with Steam Store metadata", () => {
+    const metadata = normalizeSteamStoreAppMetadata({
+      genres: [{ description: "Action" }],
+      categories: [{ description: "Single-player" }],
+      release_date: { coming_soon: false, date: "Nov 16, 2004" },
+      metacritic: { score: 96 },
+    });
+    expect(metadata).not.toBeNull();
+
+    const preview = buildSteamLibraryPreview({
+      identifier: steamid64,
+      account: {
+        steamid64,
+        displayName: "Test User",
+        customProfileId: null,
+        profileUrl: null,
+      },
+      games: [{ appid: 220, name: "Half-Life 2", playtime_forever: 123 }],
+      storeMetadataByAppId: new Map([[220, metadata!]]),
+    });
+
+    expect(preview.metadataEnrichedCount).toBe(1);
+    expect(preview.metadataFailedCount).toBe(0);
+    expect(preview.rows[0]?.normalized?.genres).toEqual(["Action"]);
+    expect(preview.rows[0]?.normalized?.tags).toEqual(["Single-player"]);
+    expect(preview.rows[0]?.normalized?.releaseYear).toBe(2004);
+    expect(preview.rows[0]?.normalized?.steamReviewScore).toBe(96);
+    expect(preview.rows[0]?.normalized?.backlogSlot).toBe("action");
+    expect(preview.rows[0]?.normalized?.rawImportMetadata.store).toMatchObject({
+      release_date: { date: "Nov 16, 2004" },
+    });
+  });
+
+  it("keeps owned-game normalization valid when Store metadata fails", () => {
+    const preview = buildSteamLibraryPreview({
+      identifier: steamid64,
+      account: {
+        steamid64,
+        displayName: "Test User",
+        customProfileId: null,
+        profileUrl: null,
+      },
+      games: [{ appid: 10, name: "Valid Game", playtime_forever: 0 }],
+      metadataFailedAppIds: new Set([10]),
+    });
+
+    expect(preview.validCount).toBe(1);
+    expect(preview.metadataEnrichedCount).toBe(0);
+    expect(preview.metadataFailedCount).toBe(1);
+    expect(preview.rows[0]?.normalized?.title).toBe("Valid Game");
+  });
+});
+
+describe("Steam Store metadata", () => {
+  it("normalizes Store appdetails metadata", () => {
+    expect(
+      normalizeSteamStoreAppMetadata({
+        genres: [{ description: "RPG" }, { description: "Simulation" }],
+        categories: [{ description: "Online Co-op" }],
+        release_date: { coming_soon: false, date: "Feb 26, 2016" },
+        metacritic: { score: 89 },
+      }),
+    ).toMatchObject({
+      genres: ["RPG", "Simulation"],
+      tags: ["Online Co-op"],
+      releaseYear: 2016,
+      steamReviewScore: 89,
+    });
+  });
+
+  it("treats Store fetch failures as per-app metadata misses", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("rate limited", { status: 429 })),
+    );
+
+    const result = await fetchSteamStoreMetadataForAppIds([220, 413150]);
+
+    expect(result.metadataByAppId.size).toBe(0);
+    expect([...result.failedAppIds].sort((a, b) => a - b)).toEqual([220, 413150]);
   });
 });

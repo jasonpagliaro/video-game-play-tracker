@@ -14,7 +14,7 @@ import {
   DEFAULT_CHECKIN_INTERVAL_DAYS,
   DEFAULT_QUEUE_WINDOW_SIZE,
   DEFAULT_SLOT_WEIGHTS,
-  PARKING_COMPLETION_TYPES,
+  OPEN_ENDED_COMPLETION_TYPES,
   type BacklogSlot,
   type CompletionType,
   type GameStatus,
@@ -26,12 +26,14 @@ import {
   rebalanceQueue as rebalanceQueueLogic,
 } from "@/lib/backlog/queue";
 import { parseSteamCsv } from "@/lib/backlog/csv";
-import { calculatePriorityScore } from "@/lib/backlog/inference";
+import { calculatePriorityScore, inferBacklogSlot, inferCompletionType } from "@/lib/backlog/inference";
 import { normalizeTitle } from "@/lib/backlog/normalize";
 import { transitionGameStatus } from "@/lib/backlog/status";
 import type { AppSettings, Game, GameSummary, ParsedCsvGame, QueueCandidate } from "@/lib/backlog/types";
 import { isDatabaseConfigured } from "@/lib/env";
+import { fetchSteamStoreMetadataForAppIds } from "@/lib/steam/client";
 import type { SteamLibraryGame, SteamLibrarySyncData } from "@/lib/steam/library";
+import type { SteamStoreMetadata } from "@/lib/steam/metadata";
 import { type AppUser, withUserDb } from "./client";
 
 type GameRow = typeof gamesTable.$inferSelect;
@@ -54,6 +56,8 @@ export type SteamImportApplyResult = ImportApplyResult & {
   syncRunId: string | null;
   missingCount: number;
   queuedCount: number;
+  metadataEnrichedCount: number;
+  metadataFailedCount: number;
 };
 
 export function defaultSettings(userId?: string): AppSettings {
@@ -247,6 +251,10 @@ export async function bulkUpdateGames(input: {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
   const gameIds = [...new Set(input.gameIds.filter(Boolean))];
   if (gameIds.length === 0) return;
+  if (input.action === "reclassify") {
+    await reclassifyGames(input.user, gameIds);
+    return;
+  }
 
   return withUserDb(input.user, async (tx) => {
     const selected = await tx.query.games.findMany({
@@ -375,6 +383,28 @@ export async function bulkUpdateGames(input: {
         windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
       });
       await persistQueueRanks(tx, input.user.id, queue);
+    }
+  });
+}
+
+async function reclassifyGames(user: AppUser, gameIds: string[]) {
+  const selected = await withUserDb(user, async (tx) =>
+    tx.query.games.findMany({
+      where: and(eq(games.userId, user.id), inArray(games.id, gameIds)),
+      orderBy: [asc(games.title)],
+    }),
+  );
+  const metadata = await fetchSteamStoreMetadataForAppIds(
+    selected.map((game) => game.steamAppId).filter((appId): appId is number => appId != null),
+  );
+
+  await withUserDb(user, async (tx) => {
+    for (const game of selected) {
+      const patch = buildReclassificationPatch(game, metadata.metadataByAppId.get(game.steamAppId ?? 0));
+      await tx
+        .update(games)
+        .set({ ...patch, updatedAt: new Date() })
+        .where(and(eq(games.userId, user.id), eq(games.id, game.id)));
     }
   });
 }
@@ -526,6 +556,8 @@ export async function applySteamLibraryImport(input: {
       queuedCount: input.decision === "queue" ? input.library.validCount : 0,
       skippedCount: input.library.skippedCount,
       rowCount: input.library.rowCount,
+      metadataEnrichedCount: input.library.metadataEnrichedCount,
+      metadataFailedCount: input.library.metadataFailedCount,
     };
   }
 
@@ -539,6 +571,7 @@ export async function applySteamLibraryImport(input: {
     for (const steamGame of input.library.games) {
       const existing = await findExistingGameBySteamAppId(tx, input.user.id, steamGame.steamAppId);
       if (existing) {
+        const classification = resolveSyncedClassification(existing, steamGame);
         const [updated] = await tx
           .update(games)
           .set({
@@ -550,7 +583,19 @@ export async function applySteamLibraryImport(input: {
             playtimeMacMinutes: steamGame.playtimeMacMinutes,
             playtimeLinuxMinutes: steamGame.playtimeLinuxMinutes,
             lastPlayed: steamGame.lastPlayed,
-            ...resolveSyncedClassification(existing, steamGame),
+            steamReviewScore: steamGame.steamReviewScore,
+            releaseYear: steamGame.releaseYear,
+            genres: steamGame.genres,
+            tags: steamGame.tags,
+            ...classification,
+            priorityScore: calculatePriorityScore({
+              personalInterest: existing.personalInterest,
+              playtimeMinutes: steamGame.playtimeMinutes,
+              steamReviewScore: steamGame.steamReviewScore,
+              estimatedHours: existing.estimatedHours,
+              completionType: classification.completionType,
+              backlogSlot: classification.backlogSlot,
+            }),
             syncState: existing.syncState === "ignored" ? "ignored" : "synced",
             lastSeenInSyncAt: now,
             lastSyncedAt: now,
@@ -576,6 +621,10 @@ export async function applySteamLibraryImport(input: {
             playtimeMacMinutes: steamGame.playtimeMacMinutes,
             playtimeLinuxMinutes: steamGame.playtimeLinuxMinutes,
             lastPlayed: steamGame.lastPlayed,
+            steamReviewScore: steamGame.steamReviewScore,
+            releaseYear: steamGame.releaseYear,
+            genres: steamGame.genres,
+            tags: steamGame.tags,
             completionType: steamGame.completionType,
             backlogSlot: steamGame.backlogSlot,
             priorityScore: steamGame.priorityScore,
@@ -615,7 +664,7 @@ export async function applySteamLibraryImport(input: {
         addedCount,
         updatedCount,
         missingCount,
-        notes: `Decision: ${input.decision}; source: Steam Web API library sync`,
+        notes: `Decision: ${input.decision}; source: Steam Web API library sync; metadata enriched: ${input.library.metadataEnrichedCount}; metadata failed: ${input.library.metadataFailedCount}`,
       })
       .returning();
 
@@ -631,6 +680,8 @@ export async function applySteamLibraryImport(input: {
       queuedCount,
       skippedCount: input.library.skippedCount,
       rowCount: input.library.rowCount,
+      metadataEnrichedCount: input.library.metadataEnrichedCount,
+      metadataFailedCount: input.library.metadataFailedCount,
     };
   });
 }
@@ -799,10 +850,51 @@ export function statusForImportDecision(
   if (decision === "park") return "parked";
   if (decision === "wont_complete") return "wont_complete";
   if (decision === "queue") return "not_started";
-  if (PARKING_COMPLETION_TYPES.includes(game.completionType) || game.backlogSlot === "parking_lot") {
+  if (OPEN_ENDED_COMPLETION_TYPES.includes(game.completionType) || game.backlogSlot === "parking_lot") {
     return "parked";
   }
   return "not_started";
+}
+
+export function buildReclassificationPatch(game: GameRow, metadata?: SteamStoreMetadata) {
+  const genres = metadata?.genres ?? game.genres;
+  const tags = metadata?.tags ?? game.tags;
+  const releaseYear = metadata?.releaseYear ?? game.releaseYear;
+  const steamReviewScore = metadata?.steamReviewScore ?? game.steamReviewScore;
+  const completionType = inferCompletionType({ title: game.title, tags, genres });
+  const backlogSlot = inferBacklogSlot({
+    title: game.title,
+    tags,
+    genres,
+    completionType,
+    playtimeMinutes: game.playtimeMinutes,
+  });
+  const classification = resolveSyncedClassification(game, { backlogSlot, completionType });
+
+  return {
+    genres,
+    tags,
+    releaseYear,
+    steamReviewScore,
+    ...classification,
+    priorityScore: calculatePriorityScore({
+      personalInterest: game.personalInterest,
+      playtimeMinutes: game.playtimeMinutes,
+      steamReviewScore,
+      estimatedHours: game.estimatedHours,
+      completionType: classification.completionType,
+      backlogSlot: classification.backlogSlot,
+    }),
+    rawImportMetadata: mergeStoreMetadata(game.rawImportMetadata, metadata),
+  };
+}
+
+function mergeStoreMetadata(rawImportMetadata: Record<string, unknown> | null, metadata?: SteamStoreMetadata) {
+  if (!metadata) return rawImportMetadata;
+  return {
+    ...(rawImportMetadata ?? {}),
+    store: metadata.raw,
+  };
 }
 
 export function resolveSyncedClassification(

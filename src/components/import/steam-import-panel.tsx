@@ -110,7 +110,8 @@ export function SteamImportPanel({ defaultDecision = "review" }: { defaultDecisi
           {result ? (
             <div className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-100">
               Synced {result.rowCount} Steam games: {result.addedCount} added, {result.updatedCount} updated,{" "}
-              {result.missingCount} missing, {result.queuedCount} queued, {result.skippedCount} skipped.
+              {result.missingCount} missing, {result.queuedCount} queued, {result.skippedCount} skipped,{" "}
+              {result.metadataEnrichedCount} enriched, {result.metadataFailedCount} metadata misses.
             </div>
           ) : null}
         </CardContent>
@@ -122,10 +123,12 @@ export function SteamImportPanel({ defaultDecision = "review" }: { defaultDecisi
             <CardTitle className="text-base">Preview: {preview.account.displayName ?? preview.account.steamid64}</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4">
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-6">
               <PreviewStat label="Rows" value={preview.rowCount} />
               <PreviewStat label="Valid" value={preview.validCount} />
               <PreviewStat label="Skipped" value={preview.skippedCount} />
+              <PreviewStat label="Enriched" value={preview.metadataEnrichedCount} />
+              <PreviewStat label="Metadata misses" value={preview.metadataFailedCount} />
               <PreviewStat label="SteamID64" value={preview.account.steamid64} mono />
             </div>
             {preview.privateOrEmpty ? (
@@ -143,8 +146,8 @@ export function SteamImportPanel({ defaultDecision = "review" }: { defaultDecisi
                       <TableHead>App</TableHead>
                       <TableHead>Playtime</TableHead>
                       <TableHead>Last played</TableHead>
-                      <TableHead>Slot</TableHead>
-                      <TableHead>Type</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Finish style</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
