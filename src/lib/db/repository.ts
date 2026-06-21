@@ -439,8 +439,7 @@ export async function applyCsvImport(input: {
             achievementsUnlocked: row.normalized.achievementsUnlocked,
             achievementsTotal: row.normalized.achievementsTotal,
             achievementPercent: row.normalized.achievementPercent,
-            completionType: existing.manualCompletionType ? existing.completionType : row.normalized.completionType,
-            backlogSlot: existing.manualBacklogSlot ? existing.backlogSlot : row.normalized.backlogSlot,
+            ...resolveSyncedClassification(existing, row.normalized),
             priorityScore: row.normalized.priorityScore,
             syncState: existing.syncState === "ignored" ? "ignored" : "imported",
             rawImportMetadata: row.normalized.rawImportMetadata,
@@ -551,6 +550,7 @@ export async function applySteamLibraryImport(input: {
             playtimeMacMinutes: steamGame.playtimeMacMinutes,
             playtimeLinuxMinutes: steamGame.playtimeLinuxMinutes,
             lastPlayed: steamGame.lastPlayed,
+            ...resolveSyncedClassification(existing, steamGame),
             syncState: existing.syncState === "ignored" ? "ignored" : "synced",
             lastSeenInSyncAt: now,
             lastSyncedAt: now,
@@ -792,16 +792,32 @@ async function persistQueueRanks(tx: Tx, userId: string, queue: QueueCandidate[]
   }
 }
 
-function statusForImportDecision(
+export function statusForImportDecision(
   decision: ImportDecision,
   game: Pick<ParsedCsvGame | SteamLibraryGame, "completionType" | "backlogSlot">,
 ): GameStatus {
   if (decision === "park") return "parked";
   if (decision === "wont_complete") return "wont_complete";
+  if (decision === "queue") return "not_started";
   if (PARKING_COMPLETION_TYPES.includes(game.completionType) || game.backlogSlot === "parking_lot") {
     return "parked";
   }
   return "not_started";
+}
+
+export function resolveSyncedClassification(
+  existing: {
+    backlogSlot: BacklogSlot;
+    completionType: CompletionType;
+    manualBacklogSlot: boolean;
+    manualCompletionType: boolean;
+  },
+  incoming: Pick<ParsedCsvGame | SteamLibraryGame, "backlogSlot" | "completionType">,
+) {
+  return {
+    completionType: existing.manualCompletionType ? existing.completionType : incoming.completionType,
+    backlogSlot: existing.manualBacklogSlot ? existing.backlogSlot : incoming.backlogSlot,
+  };
 }
 
 function mapSettings(row: typeof appSettings.$inferSelect): AppSettings {

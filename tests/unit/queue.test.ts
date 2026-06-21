@@ -61,6 +61,7 @@ describe("queue balancing", () => {
     const candidates = [
       game("ready", "action", 50, { status: "not_started" }),
       game("done", "action", 90, { status: "completed" }),
+      game("done-for-now", "action", 90, { status: "done_for_now" }),
       game("dnf", "action", 90, { status: "dnf" }),
       game("parked", "action", 90, { status: "parked" }),
       game("wont", "action", 90, { status: "wont_complete" }),

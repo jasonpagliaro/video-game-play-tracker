@@ -1,5 +1,34 @@
-import type { GameStatus } from "./constants";
+import {
+  PARKING_COMPLETION_TYPES,
+  type CompletionType,
+  type GameStatus,
+} from "./constants";
 import type { AppSettings, Game } from "./types";
+
+export const DONE_FOR_NOW_CANDIDATE_MINUTES = 120;
+
+export function isDoneForNowCandidate(
+  game: Pick<
+    Game,
+    "completionType" | "currentRotation" | "playtimeMinutes" | "queueRank" | "status" | "syncState"
+  >,
+) {
+  return (
+    isOpenEndedCompletionType(game.completionType) &&
+    game.playtimeMinutes >= DONE_FOR_NOW_CANDIDATE_MINUTES &&
+    !game.currentRotation &&
+    game.queueRank == null &&
+    game.syncState !== "ignored" &&
+    game.status !== "completed" &&
+    game.status !== "done_for_now" &&
+    game.status !== "dnf" &&
+    game.status !== "wont_complete"
+  );
+}
+
+export function isOpenEndedCompletionType(completionType: CompletionType) {
+  return PARKING_COMPLETION_TYPES.includes(completionType);
+}
 
 export type StatusTransitionInput = {
   game: Pick<
@@ -36,7 +65,7 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
   const now = input.now ?? new Date();
   const patch: TransitionPatch = { status: input.newStatus };
 
-  if (input.newStatus === "completed") {
+  if (input.newStatus === "completed" || input.newStatus === "done_for_now") {
     patch.dateCompleted = input.game.dateCompleted ?? now;
     patch.currentRotation = false;
     patch.queueRank = null;
@@ -95,4 +124,3 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
 
   return patch;
 }
-

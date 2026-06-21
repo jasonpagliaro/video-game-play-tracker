@@ -28,6 +28,13 @@ describe("Steam CSV parsing", () => {
     expect(preview.skippedCount).toBe(1);
     expect(preview.rows[0]?.valid).toBe(false);
   });
+
+  it("auto-sorts known open-ended games during CSV import", () => {
+    const preview = parseSteamCsv("game,id,hours\nStardew Valley,413150,40\n");
+
+    expect(preview.rows[0]?.normalized?.completionType).toBe("sandbox");
+    expect(preview.rows[0]?.normalized?.backlogSlot).toBe("parking_lot");
+  });
 });
 
 describe("title normalization", () => {
@@ -36,4 +43,3 @@ describe("title normalization", () => {
     expect(normalizeTitle("Café & Combat®")).toBe("cafe and combat");
   });
 });
-

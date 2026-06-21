@@ -78,6 +78,22 @@ describe("Steam library normalization", () => {
     expect(result.normalized.rawImportMetadata.source).toBe("steam_library");
   });
 
+  it("auto-sorts known open-ended Steam library titles", () => {
+    const result = normalizeSteamOwnedGame(
+      {
+        appid: 553850,
+        name: "Helldivers 2",
+        playtime_forever: 360,
+      },
+      steamid64,
+    );
+
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.normalized.completionType).toBe("live_service");
+    expect(result.normalized.backlogSlot).toBe("parking_lot");
+  });
+
   it("builds previews without treating empty libraries as missing-safe updates", () => {
     const preview = buildSteamLibraryPreview({
       identifier: steamid64,

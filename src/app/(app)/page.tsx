@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { formatMinutes } from "@/lib/backlog/format";
+import { isDoneForNowCandidate } from "@/lib/backlog/status";
 import { summarizeWarnings } from "@/lib/backlog/warnings";
 import { getGames, getSettings } from "@/lib/db/repository";
 
@@ -19,10 +20,12 @@ export default async function DashboardPage() {
   const active = games.filter((game) => game.currentRotation);
   const queued = games.filter((game) => game.queueRank != null).sort((a, b) => (a.queueRank ?? 0) - (b.queueRank ?? 0));
   const completed = games.filter((game) => game.status === "completed").length;
+  const doneForNow = games.filter((game) => game.status === "done_for_now").length;
   const dnf = games.filter((game) => game.status === "dnf").length;
   const parked = games.filter((game) => game.status === "parked").length;
   const installed = games.filter((game) => game.installed).length;
   const importedReview = games.filter((game) => game.syncState === "imported" && game.queueRank == null && !game.currentRotation).length;
+  const doneForNowCandidates = games.filter(isDoneForNowCandidate).length;
   const warnings = summarizeWarnings(games, settings);
 
   return (
@@ -43,8 +46,8 @@ export default async function DashboardPage() {
         metrics={[
           { label: "Active rotation", value: `${active.length}/${settings.maxActiveRotationCount}`, detail: "Configured active limit" },
           { label: "Installed", value: installed, detail: settings.maxInstalledCount ? `Limit ${settings.maxInstalledCount}` : "No warning limit" },
-          { label: "Completed", value: completed, detail: `${formatMinutes(games.reduce((sum, game) => sum + game.playtimeMinutes, 0))} tracked` },
-          { label: "DNF / Parked", value: `${dnf}/${parked}`, detail: `${importedReview} new imports need review` },
+          { label: "Completed / Done", value: `${completed}/${doneForNow}`, detail: `${formatMinutes(games.reduce((sum, game) => sum + game.playtimeMinutes, 0))} tracked` },
+          { label: "DNF / Parked", value: `${dnf}/${parked}`, detail: `${importedReview} imports; ${doneForNowCandidates} done-for-now candidates` },
         ]}
       />
       <WarningPanel warnings={warnings} />

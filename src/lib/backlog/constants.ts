@@ -3,6 +3,7 @@ export const GAME_STATUSES = [
   "installed",
   "in_progress",
   "completed",
+  "done_for_now",
   "dnf",
   "parked",
   "wont_complete",
@@ -63,6 +64,7 @@ export const STATUS_LABELS: Record<GameStatus, string> = {
   installed: "Installed",
   in_progress: "In Progress",
   completed: "Completed",
+  done_for_now: "Done for Now",
   dnf: "DNF",
   parked: "Parked",
   wont_complete: "Won't Complete",
@@ -130,4 +132,3 @@ export const DEFAULT_SLOT_WEIGHTS: Record<BacklogSlot, number> = {
   experimental: 0.5,
   parking_lot: 0,
 };
-

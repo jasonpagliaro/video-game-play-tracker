@@ -100,6 +100,7 @@ export function isQueueEligible(candidate: QueueCandidate) {
   if (candidate.syncState === "ignored") return false;
   if (
     candidate.status === "completed" ||
+    candidate.status === "done_for_now" ||
     candidate.status === "dnf" ||
     candidate.status === "parked" ||
     candidate.status === "wont_complete"

@@ -3,23 +3,38 @@ import {
   type CompletionType,
   PARKING_COMPLETION_TYPES,
 } from "./constants";
+import { normalizeTitle } from "./normalize";
 
 const liveServiceTerms = [
   "mmo",
   "massively multiplayer",
   "live service",
+  "live-service",
   "battle pass",
+  "battlepass",
+  "extraction shooter",
+  "persistent online",
   "seasonal",
+  "season pass",
 ];
 const sandboxTerms = ["sandbox", "survival", "craft", "builder", "simulation", "sim"];
 const multiplayerTerms = ["multiplayer", "co-op", "coop", "competitive", "pvp"];
 const roguelikeTerms = ["roguelike", "roguelite", "rogue-lite", "rogue-like"];
+const endlessTerms = ["endless", "open-ended", "open ended", "score attack", "idle", "incremental"];
 const horrorTerms = ["horror", "survival horror"];
 const puzzleTerms = ["puzzle", "logic", "hidden object", "point and click"];
 const strategyTerms = ["strategy", "builder", "city builder", "4x", "management", "tactics"];
 const rpgTerms = ["rpg", "role-playing", "open world", "jrpg", "crpg"];
 const narrativeTerms = ["story", "narrative", "visual novel", "adventure"];
 const actionTerms = ["action", "combat", "shooter", "immersive sim", "souls"];
+
+const knownCompletionTypeOverrides: Record<string, CompletionType> = {
+  [normalizeTitle("Arc Raiders")]: "live_service",
+  [normalizeTitle("Helldivers 2")]: "live_service",
+  [normalizeTitle("Stardew Valley")]: "sandbox",
+  [normalizeTitle("Valheim")]: "sandbox",
+  [normalizeTitle("Enshrouded")]: "sandbox",
+};
 
 function haystack(title: string, tags?: string[] | null, genres?: string[] | null) {
   return [title, ...(tags ?? []), ...(genres ?? [])].join(" ").toLowerCase();
@@ -34,11 +49,15 @@ export function inferCompletionType(input: {
   tags?: string[] | null;
   genres?: string[] | null;
 }): CompletionType {
+  const titleOverride = knownCompletionTypeOverrides[normalizeTitle(input.title)];
+  if (titleOverride) return titleOverride;
+
   const text = haystack(input.title, input.tags, input.genres);
   if (includesAny(text, liveServiceTerms)) return "live_service";
   if (includesAny(text, roguelikeTerms)) return "roguelike";
   if (includesAny(text, multiplayerTerms)) return "multiplayer";
   if (includesAny(text, sandboxTerms)) return "sandbox";
+  if (includesAny(text, endlessTerms)) return "endless";
   if (
     includesAny(text, [
       ...horrorTerms,
@@ -97,4 +116,3 @@ export function calculatePriorityScore(input: {
   if (input.backlogSlot === "parking_lot") score -= 25;
   return Math.max(0, Math.min(100, Math.round(score)));
 }
-

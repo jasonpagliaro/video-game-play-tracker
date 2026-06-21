@@ -21,6 +21,7 @@ export function StatusBadge({ status }: { status: GameStatus }) {
         "whitespace-nowrap",
         status === "in_progress" && "border-emerald-500/40 text-emerald-300",
         status === "completed" && "border-sky-500/40 text-sky-300",
+        status === "done_for_now" && "border-cyan-500/40 text-cyan-300",
         status === "dnf" && "border-amber-500/40 text-amber-300",
         status === "wont_complete" && "border-red-500/40 text-red-300",
         status === "parked" && "border-zinc-500/40 text-zinc-300",
@@ -62,4 +63,3 @@ export function SyncStateBadge({ syncState }: { syncState: SyncState }) {
     </Badge>
   );
 }
-
