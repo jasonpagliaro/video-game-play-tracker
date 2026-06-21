@@ -6,18 +6,32 @@ Phase 1 includes Steam library sync, CSV import, backlog views, status transitio
 
 ## Setup
 
-1. Copy `.env.example` to `.env.local`.
-2. Create a Supabase project and fill:
+Prerequisites:
+
+- Node.js 20
+- npm 10
+- A Supabase project
+- A Steam Web API key for Steam library sync
+
+1. Install dependencies from the lockfile:
+
+```bash
+npm ci
+```
+
+Use `npm install` only when intentionally changing dependencies. If the local install gets into a bad state, delete `node_modules` and run `npm ci` again rather than adding packages manually.
+
+2. Copy `.env.example` to `.env.local`.
+3. Create a Supabase project and fill:
    - `DATABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `APP_ALLOWED_EMAILS`
    - `STEAM_API_KEY`
-3. Apply the initial SQL migration in `src/db/migrations/0000_initial.sql` through Supabase SQL editor or `npm run db:migrate`.
-4. Run the app:
+4. Apply the initial SQL migration in `src/db/migrations/0000_initial.sql` through Supabase SQL editor or `npm run db:migrate`.
+5. Run the app:
 
 ```bash
-npm install
 npm run dev
 ```
 
@@ -33,6 +47,21 @@ npm run build
 npm run db:generate
 npm run db:migrate
 ```
+
+For environment validation after dependency or toolchain changes, run:
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+Known local environment notes:
+
+- The app is built against the Next.js version installed in this repo. For App Router implementation changes, prefer the local guides in `node_modules/next/dist/docs/01-app/01-getting-started/`.
+- The TypeScript target is ES2017, so use `BigInt(...)` instead of BigInt literal syntax.
+- Shell paths under App Router route groups, such as `src/app/(app)/import/page.tsx`, should be quoted.
+- npm audit can suggest forced breaking changes for framework transitive dependencies. Do not apply `npm audit fix --force` without an intentional upgrade and validation pass.
 
 ## Phase 1 Routes
 
