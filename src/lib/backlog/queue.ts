@@ -1,6 +1,8 @@
 import { BACKLOG_SLOTS, COMPLETION_TYPES, INTEREST_LABELS, SLOT_LABELS } from "./constants";
 import type { QueueCandidate, QueueExplanation } from "./types";
 
+export const MAX_CONSECUTIVE_QUEUE_SLOT = 3;
+
 export const QUEUE_RULES = {
   rankStep: 1000,
   defaultWindowSize: 5,
@@ -52,6 +54,13 @@ type Distribution = {
   total: number;
 };
 
+export type QueueSlotCluster = {
+  slot: QueueCandidate["backlogSlot"];
+  count: number;
+  startIndex: number;
+  endIndex: number;
+};
+
 export function calculateCategoryDistribution(items: Pick<QueueCandidate, "backlogSlot" | "completionType">[]) {
   const distribution: Distribution = {
     slots: Object.fromEntries(BACKLOG_SLOTS.map((slot) => [slot, 0])),
@@ -64,6 +73,36 @@ export function calculateCategoryDistribution(items: Pick<QueueCandidate, "backl
       (distribution.completionTypes[item.completionType] ?? 0) + 1;
   }
   return distribution;
+}
+
+export function findQueueSlotCluster<T extends Pick<QueueCandidate, "backlogSlot">>(
+  queue: T[],
+  maxConsecutive = MAX_CONSECUTIVE_QUEUE_SLOT,
+): QueueSlotCluster | null {
+  let currentSlot: QueueCandidate["backlogSlot"] | null = null;
+  let count = 0;
+  let startIndex = 0;
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const slot = queue[index].backlogSlot;
+    if (slot === currentSlot) {
+      count += 1;
+    } else {
+      currentSlot = slot;
+      count = 1;
+      startIndex = index;
+    }
+    if (count > maxConsecutive) {
+      return {
+        slot,
+        count,
+        startIndex,
+        endIndex: index,
+      };
+    }
+  }
+
+  return null;
 }
 
 export function insertGamesWithCategoryBalance(
@@ -91,7 +130,8 @@ export function insertGamesWithCategoryBalance(
       result.push(lockedAtPosition);
       continue;
     }
-    const scored = candidatePool
+    const eligibleCandidatePool = categorySafeCandidatePool(candidatePool, result);
+    const scored = eligibleCandidatePool
       .map((candidate) => ({
         candidate,
         score: scoreCandidate(candidate, result, target, index, totalLength, windowSize),
@@ -187,6 +227,45 @@ export function rankQueueSequentially(
   return ranked.sort((a, b) => (a.queueRank ?? Number.MAX_SAFE_INTEGER) - (b.queueRank ?? Number.MAX_SAFE_INTEGER));
 }
 
+export function repairQueueSlotClusters(
+  queue: QueueCandidate[],
+  options: { rankStep?: number } = {},
+) {
+  const rankStep = options.rankStep ?? QUEUE_RULES.rankStep;
+  const ordered = queue.filter((game) => game.queueRank != null);
+  const locked = ordered.filter((game) => game.queueLocked && game.queueRank != null);
+  const lockedByPosition = new Map<number, QueueCandidate>();
+  for (const game of locked) {
+    lockedByPosition.set(rankToIndex(game.queueRank ?? 0, rankStep), game);
+  }
+
+  const movable = ordered.filter((game) => !game.queueLocked);
+  const maxLockedPosition = Math.max(-1, ...[...lockedByPosition.keys()]);
+  const slotCount = Math.max(ordered.length, maxLockedPosition + 1);
+  const ranked: QueueCandidate[] = [];
+
+  for (let index = 0; index < slotCount; index += 1) {
+    const lockedAtPosition = lockedByPosition.get(index);
+    if (lockedAtPosition) {
+      ranked.push(lockedAtPosition);
+      continue;
+    }
+    const next = takeNextCategorySafeMovable(movable, ranked);
+    if (!next) continue;
+    ranked.push({ ...next, queueRank: (index + 1) * rankStep });
+  }
+
+  let overflowIndex = slotCount;
+  while (movable.length > 0) {
+    const next = takeNextCategorySafeMovable(movable, ranked);
+    if (!next) break;
+    ranked.push({ ...next, queueRank: (overflowIndex + 1) * rankStep });
+    overflowIndex += 1;
+  }
+
+  return ranked.sort((a, b) => (a.queueRank ?? Number.MAX_SAFE_INTEGER) - (b.queueRank ?? Number.MAX_SAFE_INTEGER));
+}
+
 export function reorderQueueByCommand(
   queue: QueueCandidate[],
   input: { gameId: string; command: QueueMoveCommand; targetGameId?: string },
@@ -195,7 +274,7 @@ export function reorderQueueByCommand(
   const ordered = normalizeQueued(queue);
   const movable = ordered.filter((game) => !game.queueLocked);
   const moving = movable.find((game) => game.id === input.gameId);
-  if (!moving) return rankQueueSequentially(ordered, options);
+  if (!moving) return repairQueueSlotClusters(ordered, options);
 
   const nextMovable = movable.filter((game) => game.id !== input.gameId);
   const currentIndex = movable.findIndex((game) => game.id === input.gameId);
@@ -210,11 +289,11 @@ export function reorderQueueByCommand(
     nextMovable.push(moving);
   } else {
     const targetIndex = nextMovable.findIndex((game) => game.id === input.targetGameId);
-    if (targetIndex === -1) return rankQueueSequentially(ordered, options);
+    if (targetIndex === -1) return repairQueueSlotClusters(ordered, options);
     nextMovable.splice(input.command === "move_before" ? targetIndex : targetIndex + 1, 0, moving);
   }
 
-  return rankQueueSequentially(rebuildQueueWithMovableOrder(ordered, nextMovable), options);
+  return repairQueueSlotClusters(rebuildQueueWithMovableOrder(ordered, nextMovable), options);
 }
 
 export function sortQueueByPreset(
@@ -230,7 +309,7 @@ export function sortQueueByPreset(
     .filter((game) => !game.queueLocked)
     .sort((a, b) => compareForSortPreset(a, b, preset, orderIndex));
 
-  return rankQueueSequentially(rebuildQueueWithMovableOrder(ordered, movable), options);
+  return repairQueueSlotClusters(rebuildQueueWithMovableOrder(ordered, movable), options);
 }
 
 function rankToIndex(rank: number, rankStep: number) {
@@ -294,6 +373,29 @@ function scoreCandidate(
     repeatTypePenalty -
     tagPenalty
   );
+}
+
+function categorySafeCandidatePool(candidates: QueueCandidate[], placed: QueueCandidate[]) {
+  const safeCandidates = candidates.filter((candidate) => !wouldExceedQueueSlotRun(candidate, placed));
+  return safeCandidates.length > 0 ? safeCandidates : candidates;
+}
+
+function wouldExceedQueueSlotRun(candidate: Pick<QueueCandidate, "backlogSlot">, placed: Pick<QueueCandidate, "backlogSlot">[]) {
+  const recent = placed.slice(-MAX_CONSECUTIVE_QUEUE_SLOT);
+  return (
+    recent.length >= MAX_CONSECUTIVE_QUEUE_SLOT &&
+    recent.every((item) => item.backlogSlot === candidate.backlogSlot)
+  );
+}
+
+function takeNextCategorySafeMovable(movable: QueueCandidate[], placed: QueueCandidate[]) {
+  if (movable.length === 0) return null;
+  let nextIndex = 0;
+  if (wouldExceedQueueSlotRun(movable[0], placed)) {
+    const alternativeIndex = movable.findIndex((candidate) => !wouldExceedQueueSlotRun(candidate, placed));
+    if (alternativeIndex !== -1) nextIndex = alternativeIndex;
+  }
+  return movable.splice(nextIndex, 1)[0] ?? null;
 }
 
 function hasTagOverlap(a?: string[] | null, b?: string[] | null) {

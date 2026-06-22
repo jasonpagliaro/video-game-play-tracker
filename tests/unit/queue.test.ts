@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateCategoryDistribution,
   filterQueueEligibleCandidates,
+  findQueueSlotCluster,
   insertGamesWithCategoryBalance,
   rankQueueSequentially,
   reorderQueueByCommand,
@@ -57,6 +58,48 @@ describe("queue balancing", () => {
     expect(slots.slice(0, 4)).toContain("puzzle");
     expect(slots.slice(0, 4)).toContain("short");
     expect(queue.every((item) => item.queueRank != null)).toBe(true);
+  });
+
+  it("avoids a fourth consecutive same-slot game when another slot is available", () => {
+    const candidates = [
+      game("action-1", "action", 100),
+      game("action-2", "action", 99),
+      game("action-3", "action", 98),
+      game("action-4", "action", 97),
+      game("puzzle-1", "puzzle", 1),
+    ];
+
+    const { queue } = insertGamesWithCategoryBalance([], candidates, { windowSize: 5 });
+
+    expect(findQueueSlotCluster(queue)).toBeNull();
+    expect(queue[3]?.id).toBe("puzzle-1");
+  });
+
+  it("leaves a same-slot run when no alternative slot exists", () => {
+    const candidates = [
+      game("action-1", "action", 100),
+      game("action-2", "action", 99),
+      game("action-3", "action", 98),
+      game("action-4", "action", 97),
+    ];
+
+    const { queue } = insertGamesWithCategoryBalance([], candidates, { windowSize: 5 });
+
+    expect(findQueueSlotCluster(queue)).toMatchObject({ slot: "action", count: 4 });
+  });
+
+  it("reports a cluster when locked positions force the run", () => {
+    const locked = [
+      game("locked-1", "action", 100, { queueLocked: true, queueRank: 1000 }),
+      game("locked-2", "action", 99, { queueLocked: true, queueRank: 2000 }),
+      game("locked-3", "action", 98, { queueLocked: true, queueRank: 3000 }),
+      game("locked-4", "action", 97, { queueLocked: true, queueRank: 4000 }),
+    ];
+
+    const { queue } = insertGamesWithCategoryBalance(locked, [game("puzzle-1", "puzzle", 1)], { windowSize: 5 });
+
+    expect(queue.slice(0, 4).map((item) => item.id)).toEqual(["locked-1", "locked-2", "locked-3", "locked-4"]);
+    expect(findQueueSlotCluster(queue)).toMatchObject({ slot: "action", count: 4 });
   });
 
   it("preserves locked positions", () => {
@@ -160,6 +203,21 @@ describe("queue balancing", () => {
       ["locked", 2000],
       ["low", 3000],
     ]);
+  });
+
+  it("repairs an existing avoidable cluster when sorting by app recommendation", () => {
+    const queue = [
+      game("action-1", "action", 100, { queueRank: 1000 }),
+      game("action-2", "action", 99, { queueRank: 2000 }),
+      game("action-3", "action", 98, { queueRank: 3000 }),
+      game("action-4", "action", 97, { queueRank: 4000 }),
+      game("puzzle-1", "puzzle", 1, { queueRank: 5000 }),
+    ];
+
+    const sorted = sortQueueByPreset(queue, "app_recommendation");
+
+    expect(findQueueSlotCluster(sorted)).toBeNull();
+    expect(sorted[3]?.id).toBe("puzzle-1");
   });
 
   it("sorts queue by each persistent preset deterministically", () => {

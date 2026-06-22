@@ -54,6 +54,7 @@ export type TransitionPatch = {
   installed?: boolean;
   currentRotation?: boolean;
   queueRank?: number | null;
+  queueLocked?: boolean;
   dateStarted?: Date;
   dateCompleted?: Date;
   dateDnf?: Date;
@@ -78,6 +79,7 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
     patch.dateCompleted = input.game.dateCompleted ?? now;
     patch.currentRotation = false;
     patch.queueRank = null;
+    patch.queueLocked = false;
     clearRotationPlanning(patch);
     if (input.settings.completedSetsInstalledFalse) patch.installed = false;
     return patch;
@@ -91,6 +93,7 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
     patch.dnfReason = input.dnfReason?.trim() || input.game.dnfReason;
     patch.currentRotation = false;
     patch.queueRank = null;
+    patch.queueLocked = false;
     clearRotationPlanning(patch);
     if (input.settings.dnfSetsInstalledFalse) patch.installed = false;
     return patch;
@@ -99,6 +102,7 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
   if (input.newStatus === "parked") {
     patch.currentRotation = false;
     patch.queueRank = null;
+    patch.queueLocked = false;
     clearRotationPlanning(patch);
     if (input.settings.parkedSetsInstalledFalse) patch.installed = false;
     return patch;
@@ -107,6 +111,7 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
   if (input.newStatus === "wont_complete") {
     patch.currentRotation = false;
     patch.queueRank = null;
+    patch.queueLocked = false;
     patch.installed = false;
     clearRotationPlanning(patch);
     return patch;
@@ -119,6 +124,8 @@ export function transitionGameStatus(input: StatusTransitionInput): TransitionPa
     if (!input.game.currentRotation && input.settings.inProgressAddsToRotationWhenSpace) {
       if (input.activeCount < input.settings.maxActiveRotationCount) {
         patch.currentRotation = true;
+        patch.queueRank = null;
+        patch.queueLocked = false;
       } else {
         patch.needsReplacement = true;
       }

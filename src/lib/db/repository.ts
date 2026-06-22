@@ -26,7 +26,6 @@ import {
 import {
   filterQueueEligibleCandidates,
   insertGamesWithCategoryBalance,
-  rankQueueSequentially,
   reorderQueueByCommand,
   rebalanceQueue as rebalanceQueueLogic,
   sortQueueByPreset,
@@ -193,6 +192,10 @@ export async function updateGameStatus(input: {
       patch.currentRotation = true;
     }
     delete patch.needsReplacement;
+    if (patch.currentRotation) {
+      patch.queueRank = null;
+      patch.queueLocked = false;
+    }
     await tx
       .update(games)
       .set({ ...patch, updatedAt: new Date() })
@@ -204,6 +207,7 @@ export async function updateGameStatus(input: {
       newStatus: input.newStatus,
       notes: input.dnfReason ?? null,
     });
+    if (game.queueRank != null || patch.queueRank != null) await rebalanceQueueRanks(tx, input.user.id);
   });
 }
 
@@ -225,12 +229,12 @@ export async function setInstalled(user: AppUser, gameId: string, installed: boo
 export async function setCurrentRotation(user: AppUser, gameId: string, currentRotation: boolean, replacementGameId?: string) {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
   return withUserDb(user, async (tx) => {
+    const target = await tx.query.games.findFirst({ where: and(eq(games.userId, user.id), eq(games.id, gameId)) });
+    if (!target) throw new Error("Game not found.");
     if (currentRotation) {
       const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, user.id) });
       const max = settingsRow?.maxActiveRotationCount ?? DEFAULT_ACTIVE_ROTATION_COUNT;
       const activeCount = await getActiveCount(tx, user.id);
-      const target = await tx.query.games.findFirst({ where: and(eq(games.userId, user.id), eq(games.id, gameId)) });
-      if (!target) throw new Error("Game not found.");
       if (!target.currentRotation && activeCount >= max) {
         if (!replacementGameId) throw new Error("Rotation is full. Choose a replacement first.");
         await tx
@@ -241,8 +245,15 @@ export async function setCurrentRotation(user: AppUser, gameId: string, currentR
     }
     await tx
       .update(games)
-      .set({ currentRotation, installed: currentRotation ? true : undefined, updatedAt: new Date() })
+      .set({
+        currentRotation,
+        installed: currentRotation ? true : undefined,
+        queueRank: currentRotation ? null : undefined,
+        queueLocked: currentRotation ? false : undefined,
+        updatedAt: new Date(),
+      })
       .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
+    if (target.queueRank != null && currentRotation) await rebalanceQueueRanks(tx, user.id);
   });
 }
 
@@ -269,6 +280,9 @@ export async function updateGameFields(
         updatedAt: new Date(),
       })
       .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
+    if (fields.backlogSlot || fields.completionType || fields.personalInterest || fields.queueLocked != null) {
+      await rebalanceQueueRanks(tx, user.id);
+    }
   });
 }
 
@@ -322,6 +336,7 @@ export async function bulkUpdateGames(input: {
           notes: "Bulk status update",
         });
       }
+      if (selected.some((game) => game.queueRank != null)) await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -330,6 +345,7 @@ export async function bulkUpdateGames(input: {
         .update(games)
         .set({ backlogSlot: input.backlogSlot, manualBacklogSlot: true, updatedAt: new Date() })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
+      await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -338,6 +354,7 @@ export async function bulkUpdateGames(input: {
         .update(games)
         .set({ completionType: input.completionType, manualCompletionType: true, updatedAt: new Date() })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
+      await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -346,22 +363,39 @@ export async function bulkUpdateGames(input: {
         .update(games)
         .set({ personalInterest: input.personalInterest, updatedAt: new Date() })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
+      await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
     if (input.action === "park") {
       await tx
         .update(games)
-        .set({ status: "parked", currentRotation: false, installed: false, queueRank: null, updatedAt: new Date() })
+        .set({
+          status: "parked",
+          currentRotation: false,
+          installed: false,
+          queueRank: null,
+          queueLocked: false,
+          updatedAt: new Date(),
+        })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
+      await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
     if (input.action === "wont_complete") {
       await tx
         .update(games)
-        .set({ status: "wont_complete", currentRotation: false, installed: false, queueRank: null, updatedAt: new Date() })
+        .set({
+          status: "wont_complete",
+          currentRotation: false,
+          installed: false,
+          queueRank: null,
+          queueLocked: false,
+          updatedAt: new Date(),
+        })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
+      await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -376,8 +410,9 @@ export async function bulkUpdateGames(input: {
     if (input.action === "mark_ignored") {
       await tx
         .update(games)
-        .set({ syncState: "ignored", currentRotation: false, queueRank: null, updatedAt: new Date() })
+        .set({ syncState: "ignored", currentRotation: false, queueRank: null, queueLocked: false, updatedAt: new Date() })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
+      await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -398,6 +433,7 @@ export async function bulkUpdateGames(input: {
           })
           .where(and(eq(games.userId, input.user.id), eq(games.id, game.id)));
       }
+      await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -439,6 +475,7 @@ async function reclassifyGames(user: AppUser, gameIds: string[]) {
         .set({ ...patch, updatedAt: new Date() })
         .where(and(eq(games.userId, user.id), eq(games.id, game.id)));
     }
+    if (selected.some((game) => game.queueRank != null)) await rebalanceQueueRanks(tx, user.id);
   });
 }
 
@@ -721,17 +758,7 @@ export async function applySteamLibraryImport(input: {
 
 export async function rebalanceUserQueue(user: AppUser) {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
-  return withUserDb(user, async (tx) => {
-    const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, user.id) });
-    const queueRows = await tx.query.games.findMany({
-      where: and(eq(games.userId, user.id), sql`${games.queueRank} is not null`),
-      orderBy: [asc(games.queueRank)],
-    });
-    const { queue } = rebalanceQueueLogic(queueRows.map(mapQueueCandidate), {
-      windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
-    });
-    await persistQueueRanks(tx, user.id, queue);
-  });
+  return withUserDb(user, async (tx) => rebalanceQueueRanks(tx, user.id));
 }
 
 export async function applyQueueCommand(
@@ -750,6 +777,7 @@ export async function applyQueueCommand(
         .update(games)
         .set({ queueRank: null, queueLocked: false, updatedAt: new Date() })
         .where(and(eq(games.userId, user.id), eq(games.id, input.gameId)));
+      await rebalanceQueueRanks(tx, user.id);
       return;
     }
 
@@ -830,7 +858,7 @@ export async function fillRotationFromQueue(user: AppUser) {
         .set({ ...buildAddToRotationPatch(), updatedAt: now })
         .where(and(eq(games.userId, user.id), eq(games.id, candidate.id)));
     }
-    await compactQueueRanks(tx, user.id);
+    await rebalanceQueueRanks(tx, user.id);
     return candidates.length;
   });
 }
@@ -852,7 +880,7 @@ export async function addQueuedGameToRotation(user: AppUser, gameId: string) {
       .update(games)
       .set({ ...buildAddToRotationPatch(), updatedAt: new Date() })
       .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
-    await compactQueueRanks(tx, user.id);
+    await rebalanceQueueRanks(tx, user.id);
   });
 }
 
@@ -885,7 +913,7 @@ export async function parkGameForLater(user: AppUser, gameId: string) {
       .set({ ...patch, updatedAt: new Date() })
       .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
     await insertStatusHistoryIfChanged(tx, user.id, target, "parked", "Parked for later reassessment");
-    if (target.queueRank != null) await compactQueueRanks(tx, user.id);
+    if (target.queueRank != null) await rebalanceQueueRanks(tx, user.id);
   });
 }
 
@@ -915,7 +943,7 @@ export async function markGameWontCompleteFromSuggestion(user: AppUser, gameId: 
       .set({ ...buildWontCompletePatch(), updatedAt: new Date() })
       .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
     await insertStatusHistoryIfChanged(tx, user.id, target, "wont_complete", "Marked from rotation suggestion");
-    if (target.queueRank != null) await compactQueueRanks(tx, user.id);
+    if (target.queueRank != null) await rebalanceQueueRanks(tx, user.id);
   });
 }
 
@@ -1066,12 +1094,16 @@ async function insertImportedGamesIntoQueue(tx: Tx, userId: string, importedIds:
   return queue.filter((item) => queuedCandidateIds.has(item.id) && item.queueRank != null).length;
 }
 
-async function compactQueueRanks(tx: Tx, userId: string) {
+async function rebalanceQueueRanks(tx: Tx, userId: string) {
+  const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, userId) });
   const queueRows = await tx.query.games.findMany({
     where: and(eq(games.userId, userId), sql`${games.queueRank} is not null`),
     orderBy: [asc(games.queueRank)],
   });
-  await persistQueueRanks(tx, userId, rankQueueSequentially(queueRows.map(mapQueueCandidate)));
+  const { queue } = rebalanceQueueLogic(queueRows.map(mapQueueCandidate), {
+    windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
+  });
+  await persistQueueRanks(tx, userId, queue);
 }
 
 async function persistQueueRanks(tx: Tx, userId: string, queue: QueueCandidate[]) {

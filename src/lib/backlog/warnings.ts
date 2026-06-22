@@ -1,5 +1,7 @@
 import type { AppSettings, GameSummary, Warning } from "./types";
 import { summarizeRotationVariety, validateRotation } from "./rotation";
+import { SLOT_LABELS } from "./constants";
+import { findQueueSlotCluster } from "./queue";
 
 export function summarizeWarnings(games: GameSummary[], settings: AppSettings): Warning[] {
   const warnings: Warning[] = [];
@@ -27,31 +29,15 @@ export function summarizeWarnings(games: GameSummary[], settings: AppSettings): 
   }
 
   warnings.push(...summarizeRotationVariety(active));
-  const badQueueRun = findQueueRun(queued);
+  const badQueueRun = findQueueSlotCluster(queued);
   if (badQueueRun) {
     warnings.push({
       code: "queue_variety_poor",
       title: "Future queue has a category cluster",
-      detail: `${badQueueRun.count} nearby queued games share the ${badQueueRun.slot} slot.`,
+      detail: `${badQueueRun.count} nearby queued games share the ${SLOT_LABELS[badQueueRun.slot]} slot.`,
       severity: "warning",
     });
   }
 
   return warnings;
 }
-
-function findQueueRun(queued: GameSummary[]) {
-  let currentSlot = "";
-  let count = 0;
-  for (const game of queued) {
-    if (game.backlogSlot === currentSlot) {
-      count += 1;
-    } else {
-      currentSlot = game.backlogSlot;
-      count = 1;
-    }
-    if (count >= 4) return { slot: currentSlot, count };
-  }
-  return null;
-}
-
