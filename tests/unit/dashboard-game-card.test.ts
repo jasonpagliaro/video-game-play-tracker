@@ -13,7 +13,7 @@ const game: GameSummary = {
   installed: false,
   currentRotation: false,
   backlogSlot: "short",
-  completionType: "needs_type",
+  completionType: "unknown",
   priorityScore: 58,
   queueRank: null,
   queueLocked: false,
@@ -53,5 +53,19 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Details");
     expect(html).toContain("Steam App 227580");
     expect(html).toContain("Score 58");
+  });
+
+  it("renders active-rotation compact cards without the details disclosure", () => {
+    const html = renderToStaticMarkup(createElement(DashboardGameCard, { game, variant: "compact" }));
+
+    expect(html).toContain('data-dashboard-card-variant="compact"');
+    expect(html).toContain("10,000,000");
+    expect(html).toContain("Not Started");
+    expect(html).toContain("Short / Palate Cleanser");
+    expect(html).toContain("Needs Type");
+    expect(html).not.toContain("<details");
+    expect(html).not.toContain("Details");
+    expect(html).not.toContain("Steam App 227580");
+    expect(html).not.toContain("Score 58");
   });
 });

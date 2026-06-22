@@ -15,12 +15,44 @@ export function DashboardGameCard({
   game,
   queuePosition,
   priorityImage = false,
+  variant = "default",
 }: {
   game: GameSummary;
   queuePosition?: number;
   priorityImage?: boolean;
+  variant?: "default" | "compact";
 }) {
   const steamStoreUrl = getSteamStoreUrl(game.steamAppId);
+
+  if (variant === "compact") {
+    return (
+      <Card size="sm" className="rounded-lg" data-dashboard-card-variant="compact">
+        <GameIdentityBanner
+          steamAppId={game.steamAppId}
+          title={game.title}
+          priority={priorityImage}
+          className="h-24 rounded-t-lg sm:h-28 xl:h-24 2xl:h-28"
+        />
+        <CardContent className="grid gap-2 pt-0">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <Link href={`/games/${game.id}`} className="min-w-0 text-sm font-medium leading-snug hover:underline">
+              <span className="line-clamp-1">{game.title}</span>
+            </Link>
+            {queuePosition ? (
+              <Badge variant="secondary" className="shrink-0 font-mono">
+                #{queuePosition}
+              </Badge>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            <StatusBadge status={game.status} />
+            <SlotBadge slot={game.backlogSlot} />
+            <CompletionTypeBadge completionType={game.completionType} />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card size="sm" className="rounded-lg">
