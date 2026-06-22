@@ -18,43 +18,47 @@ export default async function DashboardPage() {
 
   return (
     <div className="grid gap-3 p-3 lg:p-4 xl:p-5">
-      <header className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-xl font-semibold tracking-normal">Dashboard</h1>
-          <p className="mt-0.5 hidden max-w-3xl truncate text-xs text-muted-foreground sm:block">
-            Active execution state, queue health, and backlog pressure at a glance.
-          </p>
-        </div>
-        <Button asChild size="sm">
-          <Link href="/import">
-            Import / sync
-            <ArrowRight className="ml-1 h-3.5 w-3.5" />
-          </Link>
-        </Button>
-      </header>
-      <DashboardOverviewStrip summary={summary} settings={settings} />
-      <DashboardSection
-        title="Current active rotation"
-        href="/rotation"
-        empty="No active games in rotation."
-        cardGridClassName="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-      >
-        {summary.activeGames.map((game, index) => (
-          <DashboardGameCard key={game.id} game={game} priorityImage={index < 5} variant="compact" />
-        ))}
-      </DashboardSection>
-      <DashboardQueueStatus summary={summary} />
-      <RotationFillPanel games={games} settings={settings} />
-      <DashboardSection
-        title="Next up"
-        href="/queue"
-        empty="No queued games yet."
-        cardGridClassName="md:grid-cols-2 xl:grid-cols-4"
-      >
-        {summary.nextWindowGames.map((game, index) => (
-          <DashboardGameCard key={game.id} game={game} queuePosition={index + 1} priorityImage={index < 2} />
-        ))}
-      </DashboardSection>
+      <section className="grid min-h-[calc(100svh-1.5rem)] content-start gap-3 lg:min-h-[calc(100svh-2rem)] xl:min-h-[calc(100svh-2.5rem)]">
+        <header className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-normal">Dashboard</h1>
+            <p className="mt-0.5 hidden max-w-3xl truncate text-xs text-muted-foreground sm:block">
+              Active execution state, queue health, and backlog pressure at a glance.
+            </p>
+          </div>
+          <Button asChild size="sm">
+            <Link href="/import">
+              Import / sync
+              <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </header>
+        <DashboardOverviewStrip summary={summary} settings={settings} />
+        <DashboardSection
+          title="Current active rotation"
+          href="/rotation"
+          empty="No active games in rotation."
+          cardGridClassName="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        >
+          {summary.activeGames.map((game, index) => (
+            <DashboardGameCard key={game.id} game={game} priorityImage={index < 5} variant="compact" />
+          ))}
+        </DashboardSection>
+      </section>
+      <section className="grid gap-3 pt-3" aria-label="Upcoming games and queue planning">
+        <DashboardQueueStatus summary={summary} />
+        <RotationFillPanel games={games} settings={settings} />
+        <DashboardSection
+          title="Next up"
+          href="/queue"
+          empty="No queued games yet."
+          cardGridClassName="md:grid-cols-2 xl:grid-cols-4"
+        >
+          {summary.nextWindowGames.map((game, index) => (
+            <DashboardGameCard key={game.id} game={game} queuePosition={index + 1} priorityImage={index < 2} />
+          ))}
+        </DashboardSection>
+      </section>
     </div>
   );
 }
