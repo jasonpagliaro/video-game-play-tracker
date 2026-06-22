@@ -46,8 +46,8 @@ export function DashboardActiveHealth({
   ];
 
   return (
-    <Card className="rounded-lg xl:sticky xl:top-4">
-      <CardHeader>
+    <Card className="gap-2 rounded-lg py-2">
+      <CardHeader className="pb-0">
         <CardTitle className="text-base">Rotation health</CardTitle>
         <CardAction>
           <Button asChild variant="outline" size="sm">
@@ -55,20 +55,18 @@ export function DashboardActiveHealth({
           </Button>
         </CardAction>
       </CardHeader>
-      <CardContent className="grid gap-3">
-        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-          {activeItems.map((item) => (
-            <div key={item.label} className="rounded-md border border-border/70 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-medium text-muted-foreground">{item.label}</div>
-                <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              </div>
-              <div className="mt-2 font-mono text-xl font-semibold">{item.value}</div>
-              <div className="mt-1 truncate text-xs text-muted-foreground">{item.detail}</div>
+      <CardContent className="grid gap-2 lg:grid-cols-[repeat(4,minmax(0,1fr))_minmax(16rem,1.2fr)]">
+        {activeItems.map((item) => (
+          <div key={item.label} className="rounded-md border border-border/70 px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-xs font-medium text-muted-foreground">{item.label}</div>
+              <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </div>
-          ))}
-        </div>
-        <div className="flex min-w-0 items-start gap-2 rounded-md bg-muted/45 p-3">
+            <div className="mt-1 font-mono text-lg font-semibold">{item.value}</div>
+            <div className="truncate text-xs text-muted-foreground">{item.detail}</div>
+          </div>
+        ))}
+        <div className="flex min-w-0 items-start gap-2 rounded-md bg-muted/45 px-3 py-2">
           <WarningIcon
             className={primaryWarning ? "mt-0.5 h-4 w-4 shrink-0 text-amber-300" : "mt-0.5 h-4 w-4 shrink-0 text-emerald-300"}
             aria-hidden="true"

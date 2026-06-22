@@ -38,22 +38,20 @@ export default async function DashboardPage() {
           </Button>
         </header>
         <DashboardOverviewStrip summary={summary} settings={settings} />
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <DashboardSection
-            title="Current active rotation"
-            href="/rotation"
-            empty="No active games in rotation."
-            cardGridClassName="sm:grid-cols-2 2xl:grid-cols-3"
-          >
-            {summary.activeGames.map((game, index) => (
-              <DashboardGameCard key={game.id} game={game} priorityImage={index < 3} variant="active" />
-            ))}
-            {Array.from({ length: summary.active.openSlots }, (_, index) => (
-              <OpenSlotCard key={`open-slot-${index}`} slotNumber={summary.counts.active + index + 1} />
-            ))}
-          </DashboardSection>
-          <DashboardActiveHealth summary={summary} settings={settings} />
-        </div>
+        <DashboardSection
+          title="Current active rotation"
+          href="/rotation"
+          empty="No active games in rotation."
+          cardGridClassName="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        >
+          {summary.activeGames.map((game, index) => (
+            <DashboardGameCard key={game.id} game={game} priorityImage={index < 5} variant="active" />
+          ))}
+          {Array.from({ length: summary.active.openSlots }, (_, index) => (
+            <OpenSlotCard key={`open-slot-${index}`} slotNumber={summary.counts.active + index + 1} />
+          ))}
+        </DashboardSection>
+        <DashboardActiveHealth summary={summary} settings={settings} />
       </section>
       <section className="grid gap-3 pt-3" aria-label="Upcoming games and queue planning">
         <DashboardQueueStatus summary={summary} />
@@ -100,9 +98,9 @@ function DashboardSection({
 
 function OpenSlotCard({ slotNumber }: { slotNumber: number }) {
   return (
-    <Card size="sm" className="min-h-52 rounded-lg border-dashed bg-muted/20">
-      <CardContent className="flex h-full min-h-52 flex-col items-center justify-center gap-3 text-center">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background">
+    <Card size="sm" className="min-h-40 gap-2 rounded-lg border-dashed bg-muted/20 py-2">
+      <CardContent className="flex h-full min-h-40 flex-col items-center justify-center gap-2 text-center">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background">
           <Plus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
         </div>
         <div>
