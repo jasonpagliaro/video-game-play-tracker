@@ -1,14 +1,16 @@
 import type { AppSettings, GameSummary, Warning } from "./types";
 import { summarizeRotationVariety, validateRotation } from "./rotation";
 import { SLOT_LABELS } from "./constants";
-import { findQueueSlotCluster } from "./queue";
+import { findQueueSlotCluster, isQueueEligible } from "./queue";
 
 export function summarizeWarnings(games: GameSummary[], settings: AppSettings): Warning[] {
   const warnings: Warning[] = [];
   const rotation = validateRotation(games, settings);
   const installedCount = games.filter((game) => game.installed).length;
   const active = games.filter((game) => game.currentRotation);
-  const queued = games.filter((game) => game.queueRank != null).sort((a, b) => (a.queueRank ?? 0) - (b.queueRank ?? 0));
+  const queued = games
+    .filter((game) => game.queueRank != null && isQueueEligible(game))
+    .sort((a, b) => (a.queueRank ?? 0) - (b.queueRank ?? 0));
 
   if (!rotation.valid) {
     warnings.push({

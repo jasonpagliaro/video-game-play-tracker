@@ -33,7 +33,7 @@ export type DashboardSummary = {
 export function getDashboardSummary(games: GameSummary[], settings: AppSettings): DashboardSummary {
   const activeGames = games.filter((game) => game.currentRotation).sort(compareByTitle);
   const queuedGames = games
-    .filter((game) => game.queueRank != null)
+    .filter((game) => game.queueRank != null && isQueueEligible(game))
     .sort((a, b) => (a.queueRank ?? Number.MAX_SAFE_INTEGER) - (b.queueRank ?? Number.MAX_SAFE_INTEGER));
   const warnings = summarizeWarnings(games, settings);
   const windowSize = Math.max(1, settings.queueSlidingWindowSize);

@@ -38,8 +38,8 @@ export function DashboardOverviewStrip({
     },
     {
       label: "Library",
-      value: summary.counts.totalGames.toString(),
-      detail: formatMinutes(summary.counts.totalPlaytimeMinutes),
+      value: `${summary.counts.totalGames} / ${summary.queue.total}`,
+      detail: `library / in queue; ${formatMinutes(summary.counts.totalPlaytimeMinutes)} tracked`,
       icon: Archive,
     },
   ];

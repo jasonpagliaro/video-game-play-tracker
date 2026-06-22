@@ -70,6 +70,27 @@ describe("dashboard summary", () => {
     expect(summary.nextWindowGames.map((item) => item.id)).toEqual(["q1", "q2", "q3"]);
   });
 
+  it("excludes terminal and held ranked games from queue totals", () => {
+    const summary = getDashboardSummary(
+      [
+        game({ id: "ready", queueRank: 1000, backlogSlot: "action" }),
+        game({ id: "completed", status: "completed", queueRank: 2000, backlogSlot: "action" }),
+        game({ id: "done-now", status: "done_for_now", queueRank: 3000, backlogSlot: "action" }),
+        game({ id: "dnf", status: "dnf", queueRank: 4000, backlogSlot: "action" }),
+        game({ id: "parked", status: "parked", queueRank: 5000, backlogSlot: "action" }),
+        game({ id: "wont", status: "wont_complete", queueRank: 6000, backlogSlot: "action" }),
+        game({ id: "held", parkedForLater: true, queueRank: 7000, backlogSlot: "action" }),
+        game({ id: "active", currentRotation: true, queueRank: 8000, backlogSlot: "action" }),
+        game({ id: "ignored", syncState: "ignored", queueRank: 9000, backlogSlot: "action" }),
+      ],
+      defaultSettings(),
+    );
+
+    expect(summary.queue.total).toBe(1);
+    expect(summary.queue.warningCount).toBe(0);
+    expect(summary.nextWindowGames.map((item) => item.id)).toEqual(["ready"]);
+  });
+
   it("excludes active, terminal, parked, and ignored games from eligible unqueued totals", () => {
     const summary = getDashboardSummary(
       [

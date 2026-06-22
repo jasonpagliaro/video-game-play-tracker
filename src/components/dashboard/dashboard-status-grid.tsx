@@ -39,7 +39,7 @@ export function DashboardStatusGrid({
     },
     {
       label: "Library",
-      value: summary.counts.totalGames.toString(),
+      value: `${summary.counts.totalGames} / ${summary.queue.total}`,
       detail: `${summary.counts.steamIdentified} Steam IDs; ${formatMinutes(summary.counts.totalPlaytimeMinutes)} tracked`,
       icon: Archive,
     },
