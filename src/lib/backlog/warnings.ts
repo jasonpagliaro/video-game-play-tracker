@@ -1,7 +1,9 @@
 import type { AppSettings, GameSummary, Warning } from "./types";
 import { summarizeRotationVariety, validateRotation } from "./rotation";
-import { SLOT_LABELS } from "./constants";
+import { SLOT_LABELS, type BacklogSlot } from "./constants";
 import { findQueueSlotCluster, isQueueEligible } from "./queue";
+
+const QUEUE_VARIETY_PLACEHOLDER_SLOTS: readonly BacklogSlot[] = ["experimental"];
 
 export function summarizeWarnings(games: GameSummary[], settings: AppSettings): Warning[] {
   const warnings: Warning[] = [];
@@ -31,7 +33,9 @@ export function summarizeWarnings(games: GameSummary[], settings: AppSettings): 
   }
 
   warnings.push(...summarizeRotationVariety(active));
-  const badQueueRun = findQueueSlotCluster(queued);
+  const badQueueRun = findQueueSlotCluster(queued, undefined, {
+    ignoredSlots: QUEUE_VARIETY_PLACEHOLDER_SLOTS,
+  });
   if (badQueueRun) {
     warnings.push({
       code: "queue_variety_poor",

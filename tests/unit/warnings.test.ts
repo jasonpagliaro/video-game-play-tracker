@@ -59,7 +59,7 @@ describe("warning summaries", () => {
     expect(warnings.some((warning) => warning.code === "queue_variety_poor")).toBe(false);
   });
 
-  it("uses display labels in queue cluster warnings", () => {
+  it("does not warn on Needs Review placeholder clusters", () => {
     const warnings = summarizeWarnings(
       [
         game({ id: "experimental-1", queueRank: 1000, backlogSlot: "experimental" }),
@@ -69,9 +69,23 @@ describe("warning summaries", () => {
       ],
       defaultSettings(),
     );
+
+    expect(warnings.some((item) => item.code === "queue_variety_poor")).toBe(false);
+  });
+
+  it("uses display labels in queue cluster warnings", () => {
+    const warnings = summarizeWarnings(
+      [
+        game({ id: "rpg-1", queueRank: 1000, backlogSlot: "rpg_long" }),
+        game({ id: "rpg-2", queueRank: 2000, backlogSlot: "rpg_long" }),
+        game({ id: "rpg-3", queueRank: 3000, backlogSlot: "rpg_long" }),
+        game({ id: "rpg-4", queueRank: 4000, backlogSlot: "rpg_long" }),
+      ],
+      defaultSettings(),
+    );
     const warning = warnings.find((item) => item.code === "queue_variety_poor");
 
-    expect(warning?.detail).toContain("Needs Review");
-    expect(warning?.detail).not.toContain("experimental");
+    expect(warning?.detail).toContain("RPG / Long");
+    expect(warning?.detail).not.toContain("rpg_long");
   });
 });

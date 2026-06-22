@@ -78,7 +78,9 @@ export function calculateCategoryDistribution(items: Pick<QueueCandidate, "backl
 export function findQueueSlotCluster<T extends Pick<QueueCandidate, "backlogSlot">>(
   queue: T[],
   maxConsecutive = MAX_CONSECUTIVE_QUEUE_SLOT,
+  options: { ignoredSlots?: readonly QueueCandidate["backlogSlot"][] } = {},
 ): QueueSlotCluster | null {
+  const ignoredSlots = new Set(options.ignoredSlots ?? []);
   let currentSlot: QueueCandidate["backlogSlot"] | null = null;
   let count = 0;
   let startIndex = 0;
@@ -92,7 +94,7 @@ export function findQueueSlotCluster<T extends Pick<QueueCandidate, "backlogSlot
       count = 1;
       startIndex = index;
     }
-    if (count > maxConsecutive) {
+    if (count > maxConsecutive && !ignoredSlots.has(slot)) {
       return {
         slot,
         count,
