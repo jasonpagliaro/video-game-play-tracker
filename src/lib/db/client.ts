@@ -63,6 +63,7 @@ async function ensureRuntimeSchema(database: PostgresJsDatabase<typeof schema>) 
 async function runRuntimeSchemaBootstrap(database: PostgresJsDatabase<typeof schema>) {
   await database.transaction(async (tx) => {
     await tx.execute(sql`select pg_advisory_xact_lock(hashtext('video_game_play_tracker_schema_0002')::bigint)`);
+    await tx.execute(sql.raw("alter type game_status add value if not exists 'done_for_now'"));
     await tx.execute(sql.raw(`
       alter table app_settings
         add column if not exists rotation_skip_cooldown_days integer not null default 90,
