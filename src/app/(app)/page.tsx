@@ -1,14 +1,18 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Plus } from "lucide-react";
 
+import { DashboardActiveHealth } from "@/components/dashboard/dashboard-active-health";
 import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
 import { DashboardOverviewStrip } from "@/components/dashboard/dashboard-overview-strip";
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
+import { DashboardQueueRow } from "@/components/dashboard/dashboard-queue-row";
 import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { getDashboardSummary } from "@/lib/backlog/dashboard";
+import type { GameSummary } from "@/lib/backlog/types";
 import { getGames, getSettings } from "@/lib/db/repository";
 
 export default async function DashboardPage() {
@@ -34,30 +38,27 @@ export default async function DashboardPage() {
           </Button>
         </header>
         <DashboardOverviewStrip summary={summary} settings={settings} />
-        <DashboardSection
-          title="Current active rotation"
-          href="/rotation"
-          empty="No active games in rotation."
-          cardGridClassName="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-        >
-          {summary.activeGames.map((game, index) => (
-            <DashboardGameCard key={game.id} game={game} priorityImage={index < 5} variant="compact" />
-          ))}
-        </DashboardSection>
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <DashboardSection
+            title="Current active rotation"
+            href="/rotation"
+            empty="No active games in rotation."
+            cardGridClassName="sm:grid-cols-2 2xl:grid-cols-3"
+          >
+            {summary.activeGames.map((game, index) => (
+              <DashboardGameCard key={game.id} game={game} priorityImage={index < 3} variant="active" />
+            ))}
+            {Array.from({ length: summary.active.openSlots }, (_, index) => (
+              <OpenSlotCard key={`open-slot-${index}`} slotNumber={summary.counts.active + index + 1} />
+            ))}
+          </DashboardSection>
+          <DashboardActiveHealth summary={summary} settings={settings} />
+        </div>
       </section>
       <section className="grid gap-3 pt-3" aria-label="Upcoming games and queue planning">
         <DashboardQueueStatus summary={summary} />
         <RotationFillPanel games={games} settings={settings} />
-        <DashboardSection
-          title="Next up"
-          href="/queue"
-          empty="No queued games yet."
-          cardGridClassName="md:grid-cols-2 xl:grid-cols-4"
-        >
-          {summary.nextWindowGames.map((game, index) => (
-            <DashboardGameCard key={game.id} game={game} queuePosition={index + 1} priorityImage={index < 2} />
-          ))}
-        </DashboardSection>
+        <DashboardQueueRowsSection games={summary.nextWindowGames} />
       </section>
     </div>
   );
@@ -93,6 +94,47 @@ function DashboardSection({
       {Array.isArray(children) && children.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">{empty}</div>
       ) : null}
+    </section>
+  );
+}
+
+function OpenSlotCard({ slotNumber }: { slotNumber: number }) {
+  return (
+    <Card size="sm" className="min-h-52 rounded-lg border-dashed bg-muted/20">
+      <CardContent className="flex h-full min-h-52 flex-col items-center justify-center gap-3 text-center">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background">
+          <Plus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+        </div>
+        <div>
+          <div className="text-sm font-medium">Open slot {slotNumber}</div>
+          <div className="mt-1 text-xs text-muted-foreground">Ready for the next rotation pick</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function DashboardQueueRowsSection({ games }: { games: GameSummary[] }) {
+  return (
+    <section className="grid gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold">Next up</h2>
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/queue">
+            View all
+            <ArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </Button>
+      </div>
+      <div className="grid gap-2">
+        {games.length ? (
+          games.map((game, index) => <DashboardQueueRow key={game.id} game={game} position={index + 1} />)
+        ) : (
+          <div className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+            No queued games yet.
+          </div>
+        )}
+      </div>
     </section>
   );
 }

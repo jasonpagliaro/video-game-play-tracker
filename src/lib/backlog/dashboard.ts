@@ -8,6 +8,16 @@ export type DashboardSummary = {
   queuedGames: GameSummary[];
   nextWindowGames: GameSummary[];
   warnings: Warning[];
+  active: {
+    openSlots: number;
+    recentlyPlayedCount: number;
+    staleCount: number;
+    totalPlaytimeMinutes: number;
+    achievementTrackedCount: number;
+    achievementCoveragePercent: number | null;
+    achievementAveragePercent: number | null;
+    primaryWarning: Warning | null;
+  };
   counts: {
     totalGames: number;
     active: number;
@@ -30,7 +40,11 @@ export type DashboardSummary = {
   };
 };
 
-export function getDashboardSummary(games: GameSummary[], settings: AppSettings): DashboardSummary {
+export function getDashboardSummary(
+  games: GameSummary[],
+  settings: AppSettings,
+  options: { now?: Date } = {},
+): DashboardSummary {
   const activeGames = games.filter((game) => game.currentRotation).sort(compareByTitle);
   const queuedGames = games
     .filter((game) => game.queueRank != null && isQueueEligible(game))
@@ -38,12 +52,33 @@ export function getDashboardSummary(games: GameSummary[], settings: AppSettings)
   const warnings = summarizeWarnings(games, settings);
   const windowSize = Math.max(1, settings.queueSlidingWindowSize);
   const queueEligibleUnqueued = games.filter((game) => game.queueRank == null && isQueueEligible(game));
+  const activeWarning =
+    warnings.find((warning) => warning.code.includes("active") || warning.code.includes("rotation")) ?? null;
+  const nowMs = options.now?.getTime() ?? Date.now();
+  const checkinWindowMs = Math.max(1, settings.checkinIntervalDays) * 24 * 60 * 60 * 1000;
+  const recentCutoffMs = nowMs - checkinWindowMs;
+  const activeLastPlayedTimes = activeGames.map((game) => getDateTime(game.lastPlayed));
+  const activeAchievementValues = activeGames
+    .map((game) => game.achievementPercent)
+    .filter((value): value is number => value != null);
 
   return {
     activeGames,
     queuedGames,
     nextWindowGames: queuedGames.slice(0, windowSize),
     warnings,
+    active: {
+      openSlots: Math.max(0, settings.maxActiveRotationCount - activeGames.length),
+      recentlyPlayedCount: activeLastPlayedTimes.filter((time) => time != null && time >= recentCutoffMs).length,
+      staleCount: activeLastPlayedTimes.filter((time) => time == null || time < recentCutoffMs).length,
+      totalPlaytimeMinutes: activeGames.reduce((sum, game) => sum + game.playtimeMinutes, 0),
+      achievementTrackedCount: activeAchievementValues.length,
+      achievementCoveragePercent: activeGames.length ? (activeAchievementValues.length / activeGames.length) * 100 : null,
+      achievementAveragePercent: activeAchievementValues.length
+        ? activeAchievementValues.reduce((sum, value) => sum + value, 0) / activeAchievementValues.length
+        : null,
+      primaryWarning: activeWarning,
+    },
     counts: {
       totalGames: games.length,
       active: activeGames.length,
@@ -69,4 +104,11 @@ export function getDashboardSummary(games: GameSummary[], settings: AppSettings)
 
 function compareByTitle(a: GameSummary, b: GameSummary) {
   return a.title.localeCompare(b.title);
+}
+
+function getDateTime(value: Date | string | null | undefined) {
+  if (!value) return null;
+  const parsed = typeof value === "string" ? new Date(value) : value;
+  const time = parsed.getTime();
+  return Number.isNaN(time) ? null : time;
 }

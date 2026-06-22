@@ -68,4 +68,22 @@ describe("DashboardGameCard", () => {
     expect(html).not.toContain("Steam App 227580");
     expect(html).not.toContain("Score 58");
   });
+
+  it("renders active cards with inline progress and actions", () => {
+    const html = renderToStaticMarkup(createElement(DashboardGameCard, { game, variant: "active" }));
+
+    expect(html).toContain('data-dashboard-card-variant="active"');
+    expect(html).toContain("10,000,000");
+    expect(html).toContain("Played");
+    expect(html).toContain("10m");
+    expect(html).toContain("Ach");
+    expect(html).toContain("Est");
+    expect(html).toContain("Last");
+    expect(html).toContain("Steam App 227580");
+    expect(html).toContain("Score 58");
+    expect(html).toContain("Open");
+    expect(html).toContain("Steam");
+    expect(html).not.toContain("<details");
+    expect(html).not.toContain("Details");
+  });
 });

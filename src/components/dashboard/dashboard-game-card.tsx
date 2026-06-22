@@ -20,9 +20,70 @@ export function DashboardGameCard({
   game: GameSummary;
   queuePosition?: number;
   priorityImage?: boolean;
-  variant?: "default" | "compact";
+  variant?: "default" | "compact" | "active";
 }) {
   const steamStoreUrl = getSteamStoreUrl(game.steamAppId);
+
+  if (variant === "active") {
+    return (
+      <Card size="sm" className="rounded-lg" data-dashboard-card-variant="active">
+        <GameIdentityBanner
+          steamAppId={game.steamAppId}
+          title={game.title}
+          priority={priorityImage}
+          className="h-24 rounded-t-lg sm:h-28 xl:h-24 2xl:h-28"
+        />
+        <CardContent className="grid gap-3 pt-0">
+          <div className="grid gap-2">
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <Link href={`/games/${game.id}`} className="min-w-0 text-sm font-medium leading-snug hover:underline">
+                <span className="line-clamp-2">{game.title}</span>
+              </Link>
+              {queuePosition ? (
+                <Badge variant="secondary" className="shrink-0 font-mono">
+                  #{queuePosition}
+                </Badge>
+              ) : null}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <StatusBadge status={game.status} />
+              <SlotBadge slot={game.backlogSlot} />
+              <CompletionTypeBadge completionType={game.completionType} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 rounded-md bg-muted/60 p-2 text-xs sm:grid-cols-4">
+            <Metric label="Played" value={formatMinutes(game.playtimeMinutes)} />
+            <Metric label="Ach" value={formatPercent(game.achievementPercent)} />
+            <Metric label="Est" value={game.estimatedHours ? `${game.estimatedHours}h` : "-"} />
+            <Metric label="Last" value={formatDate(game.lastPlayed)} />
+          </div>
+
+          <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+            <span className="truncate font-mono">{getSteamIdentityLabel(game.steamAppId)}</span>
+            <span className="shrink-0">Score {game.priorityScore}</span>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/games/${game.id}`}>
+                Open
+                <ArrowUpRight className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+            {steamStoreUrl ? (
+              <Button asChild size="sm" variant="ghost">
+                <a href={steamStoreUrl} target="_blank" rel="noreferrer">
+                  Steam
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </Button>
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (variant === "compact") {
     return (

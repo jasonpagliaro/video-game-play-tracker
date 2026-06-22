@@ -45,6 +45,11 @@ describe("dashboard summary", () => {
     const summary = getDashboardSummary([], defaultSettings());
 
     expect(summary.counts.totalGames).toBe(0);
+    expect(summary.active.openSlots).toBe(defaultSettings().maxActiveRotationCount);
+    expect(summary.active.recentlyPlayedCount).toBe(0);
+    expect(summary.active.staleCount).toBe(0);
+    expect(summary.active.achievementCoveragePercent).toBeNull();
+    expect(summary.active.primaryWarning).toBeNull();
     expect(summary.queue.total).toBe(0);
     expect(summary.queue.nextWindowCount).toBe(0);
     expect(summary.queue.eligibleUnqueued).toBe(0);
@@ -136,5 +141,48 @@ describe("dashboard summary", () => {
     );
 
     expect(summary.queue.warningCount).toBe(1);
+  });
+
+  it("summarizes active rotation health with open slots and stale play", () => {
+    const settings = { ...defaultSettings(), maxActiveRotationCount: 5, checkinIntervalDays: 7 };
+    const summary = getDashboardSummary(
+      [
+        game({
+          id: "recent",
+          currentRotation: true,
+          backlogSlot: "action",
+          playtimeMinutes: 60,
+          achievementPercent: 50,
+          lastPlayed: new Date("2026-06-20T12:00:00Z"),
+        }),
+        game({
+          id: "stale",
+          currentRotation: true,
+          backlogSlot: "action",
+          playtimeMinutes: 120,
+          achievementPercent: 100,
+          lastPlayed: new Date("2026-06-01T12:00:00Z"),
+        }),
+        game({
+          id: "never",
+          currentRotation: true,
+          backlogSlot: "action",
+          playtimeMinutes: 30,
+          achievementPercent: null,
+          lastPlayed: null,
+        }),
+      ],
+      settings,
+      { now: new Date("2026-06-22T12:00:00Z") },
+    );
+
+    expect(summary.active.openSlots).toBe(2);
+    expect(summary.active.recentlyPlayedCount).toBe(1);
+    expect(summary.active.staleCount).toBe(2);
+    expect(summary.active.totalPlaytimeMinutes).toBe(210);
+    expect(summary.active.achievementTrackedCount).toBe(2);
+    expect(summary.active.achievementCoveragePercent).toBeCloseTo(66.67, 1);
+    expect(summary.active.achievementAveragePercent).toBe(75);
+    expect(summary.active.primaryWarning?.code).toBe("rotation_slot_cluster");
   });
 });
