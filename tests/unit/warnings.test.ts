@@ -42,6 +42,35 @@ function game(overrides: Partial<GameSummary> = {}): GameSummary {
 }
 
 describe("warning summaries", () => {
+  it("does not warn when active rotation repeats non-open-ended completion types", () => {
+    const warnings = summarizeWarnings(
+      [
+        game({ id: "action", currentRotation: true, backlogSlot: "action", completionType: "completable" }),
+        game({ id: "puzzle", currentRotation: true, backlogSlot: "puzzle", completionType: "completable" }),
+        game({ id: "narrative", currentRotation: true, backlogSlot: "narrative", completionType: "completable" }),
+        game({ id: "unknown", currentRotation: true, backlogSlot: "horror", completionType: "unknown" }),
+      ],
+      defaultSettings(),
+    );
+
+    expect(warnings.some((warning) => warning.code === "rotation_type_cluster")).toBe(false);
+  });
+
+  it("warns when active rotation repeats an open-ended completion type", () => {
+    const warnings = summarizeWarnings(
+      [
+        game({ id: "live-1", currentRotation: true, backlogSlot: "action", completionType: "live_service" }),
+        game({ id: "live-2", currentRotation: true, backlogSlot: "puzzle", completionType: "live_service" }),
+        game({ id: "live-3", currentRotation: true, backlogSlot: "narrative", completionType: "live_service" }),
+      ],
+      defaultSettings(),
+    );
+    const warning = warnings.find((item) => item.code === "rotation_type_cluster");
+
+    expect(warning?.title).toBe("Active rotation repeats open-ended completion type");
+    expect(warning?.detail).toContain("Live Service");
+  });
+
   it("does not warn after an auto-healable queue is rebalanced", () => {
     const queue = sortQueueByPreset(
       [

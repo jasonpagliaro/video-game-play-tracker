@@ -143,6 +143,19 @@ describe("dashboard summary", () => {
     expect(summary.queue.warningCount).toBe(1);
   });
 
+  it("does not raise a dashboard active warning for varied completable games", () => {
+    const summary = getDashboardSummary(
+      [
+        game({ id: "action", currentRotation: true, backlogSlot: "action", completionType: "completable" }),
+        game({ id: "puzzle", currentRotation: true, backlogSlot: "puzzle", completionType: "completable" }),
+        game({ id: "narrative", currentRotation: true, backlogSlot: "narrative", completionType: "completable" }),
+      ],
+      defaultSettings(),
+    );
+
+    expect(summary.active.primaryWarning).toBeNull();
+  });
+
   it("summarizes active rotation health with open slots and stale play", () => {
     const settings = { ...defaultSettings(), maxActiveRotationCount: 5, checkinIntervalDays: 7 };
     const summary = getDashboardSummary(

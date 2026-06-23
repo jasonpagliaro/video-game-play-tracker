@@ -1,6 +1,8 @@
 import type { BacklogSlot, CompletionType } from "./constants";
-import { COMPLETION_TYPE_LABELS, SLOT_LABELS } from "./constants";
+import { COMPLETION_TYPE_LABELS, OPEN_ENDED_COMPLETION_TYPES, SLOT_LABELS } from "./constants";
 import type { AppSettings, GameSummary, Warning } from "./types";
+
+const OPEN_ENDED_COMPLETION_TYPE_SET = new Set<CompletionType>(OPEN_ENDED_COMPLETION_TYPES);
 
 export function validateRotation(
   games: Pick<GameSummary, "id" | "currentRotation" | "backlogSlot" | "completionType">[],
@@ -21,7 +23,10 @@ export function summarizeRotationVariety(active: Pick<GameSummary, "backlogSlot"
   const slotCounts = countBy(active.map((game) => game.backlogSlot));
   const typeCounts = countBy(active.map((game) => game.completionType));
   const repeatedSlot = Object.entries(slotCounts).find(([, count]) => count >= Math.max(3, active.length - 1));
-  const repeatedType = Object.entries(typeCounts).find(([, count]) => count >= Math.max(3, active.length - 1));
+  const repeatedType = Object.entries(typeCounts).find(
+    ([type, count]) =>
+      OPEN_ENDED_COMPLETION_TYPE_SET.has(type as CompletionType) && count >= Math.max(3, active.length - 1),
+  );
 
   if (repeatedSlot) {
     warnings.push({
@@ -34,7 +39,7 @@ export function summarizeRotationVariety(active: Pick<GameSummary, "backlogSlot"
   if (repeatedType) {
     warnings.push({
       code: "rotation_type_cluster",
-      title: "Active rotation lacks completion-type variety",
+      title: "Active rotation repeats open-ended completion type",
       detail: `${repeatedType[1]} active games are ${COMPLETION_TYPE_LABELS[repeatedType[0] as CompletionType]}.`,
       severity: "warning",
     });
@@ -51,4 +56,3 @@ function countBy<T extends string>(values: T[]) {
     {} as Record<T, number>,
   );
 }
-
