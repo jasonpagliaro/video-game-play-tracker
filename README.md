@@ -104,7 +104,7 @@ Steam libraries must be visible to the API. Empty/private-library results are sa
 
 The app includes a secured Vercel Cron route at `/api/cron/steam-refresh`. It refreshes saved Steam accounts when their per-user Settings cadence is due. The cadence is configured as days plus hours, defaults to 1 day, and is enabled by default after a Steam account has been synced.
 
-Set `CRON_SECRET` in Vercel. The cron route requires `Authorization: Bearer $CRON_SECRET`. The committed `vercel.json` uses an hourly trigger so hour-level cadences can be honored; Vercel Hobby plans only support daily cron schedules.
+Set `CRON_SECRET` in Vercel. The cron route requires `Authorization: Bearer $CRON_SECRET`. The committed `vercel.json` uses a daily trigger so it can deploy on Vercel Hobby. The route still honors days-plus-hours cadences whenever it is invoked; sub-day production refreshes require Vercel Pro cron frequency or an external scheduler calling the same route more often.
 
 ## Deployment
 
