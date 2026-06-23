@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/steam-refresh",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

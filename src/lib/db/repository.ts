@@ -51,7 +51,8 @@ import { isDatabaseConfigured } from "@/lib/env";
 import { fetchSteamStoreMetadataForAppIds } from "@/lib/steam/client";
 import type { SteamLibraryGame, SteamLibrarySyncData } from "@/lib/steam/library";
 import type { SteamStoreMetadata } from "@/lib/steam/metadata";
-import { type AppUser, withUserDb } from "./client";
+import { isSteamRefreshDue, validateSteamSyncInterval } from "@/lib/steam/auto-refresh";
+import { type AppUser, withSystemDb, withUserDb } from "./client";
 
 type GameRow = typeof gamesTable.$inferSelect;
 type Tx = Parameters<Parameters<ReturnType<typeof import("./client").getDb>["transaction"]>[0]>[0];
@@ -79,6 +80,21 @@ export type SteamImportApplyResult = ImportApplyResult & {
   metadataFailedCount: number;
 };
 
+export type DueSteamAutoRefreshAccount = {
+  user: AppUser;
+  steamAccountId: string;
+  steamid64: string;
+  displayName: string | null;
+  lastLibrarySyncAt: Date | null;
+  intervalHours: number;
+  autoQueueNewImports: boolean;
+};
+
+export type DueSteamAutoRefreshAccountsResult = {
+  checkedCount: number;
+  dueAccounts: DueSteamAutoRefreshAccount[];
+};
+
 export function defaultSettings(userId?: string): AppSettings {
   return {
     userId,
@@ -93,6 +109,9 @@ export function defaultSettings(userId?: string): AppSettings {
     inProgressAddsToRotationWhenSpace: true,
     autoQueueNewImports: false,
     protectManualFieldsFromSync: true,
+    steamAutoSyncEnabled: true,
+    steamSyncIntervalDays: 1,
+    steamSyncIntervalHours: 0,
     queueSlidingWindowSize: DEFAULT_QUEUE_WINDOW_SIZE,
     rotationSkipCooldownDays: DEFAULT_ROTATION_SKIP_COOLDOWN_DAYS,
     rotationSkipLimit: DEFAULT_ROTATION_SKIP_LIMIT,
@@ -483,6 +502,14 @@ export async function updateSettings(user: AppUser, next: Partial<AppSettings>) 
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
   return withUserDb(user, async (tx) => {
     const currentActiveCount = await getActiveCount(tx, user.id);
+    const settingsRow = await tx.query.appSettings.findFirst({ where: eq(appSettings.userId, user.id) });
+    const currentSettings = settingsRow ? mapSettings(settingsRow) : defaultSettings(user.id);
+    const mergedSettings = { ...currentSettings, ...next };
+    const steamIntervalError = validateSteamSyncInterval(
+      mergedSettings.steamSyncIntervalDays,
+      mergedSettings.steamSyncIntervalHours,
+    );
+    if (steamIntervalError) throw new Error(steamIntervalError);
     if (
       typeof next.maxActiveRotationCount === "number" &&
       next.maxActiveRotationCount < currentActiveCount
@@ -753,6 +780,77 @@ export async function applySteamLibraryImport(input: {
       metadataEnrichedCount: input.library.metadataEnrichedCount,
       metadataFailedCount: input.library.metadataFailedCount,
     };
+  });
+}
+
+export async function getDueSteamAutoRefreshAccounts({
+  now = new Date(),
+  limit = 5,
+}: {
+  now?: Date;
+  limit?: number;
+} = {}): Promise<DueSteamAutoRefreshAccountsResult> {
+  if (!isDatabaseConfigured()) return { checkedCount: 0, dueAccounts: [] };
+
+  return withSystemDb(async (tx) => {
+    const rows = await tx
+      .select({
+        steamAccountId: steamAccounts.id,
+        userId: steamAccounts.userId,
+        displayName: steamAccounts.displayName,
+        steamid64: steamAccounts.steamid64,
+        lastLibrarySyncAt: steamAccounts.lastLibrarySyncAt,
+        autoQueueNewImports: appSettings.autoQueueNewImports,
+        steamAutoSyncEnabled: appSettings.steamAutoSyncEnabled,
+        steamSyncIntervalDays: appSettings.steamSyncIntervalDays,
+        steamSyncIntervalHours: appSettings.steamSyncIntervalHours,
+      })
+      .from(steamAccounts)
+      .innerJoin(appSettings, eq(steamAccounts.userId, appSettings.userId))
+      .where(eq(steamAccounts.syncEnabled, true));
+
+    const dueAccounts = rows
+      .filter((row) => isSteamRefreshDue(row, now))
+      .sort((a, b) => {
+        const aTime = a.lastLibrarySyncAt?.getTime() ?? 0;
+        const bTime = b.lastLibrarySyncAt?.getTime() ?? 0;
+        return aTime - bTime;
+      })
+      .slice(0, Math.max(1, limit))
+      .map((row) => ({
+        user: { id: row.userId, email: null },
+        steamAccountId: row.steamAccountId,
+        steamid64: row.steamid64 ?? "",
+        displayName: row.displayName,
+        lastLibrarySyncAt: row.lastLibrarySyncAt,
+        intervalHours: row.steamSyncIntervalDays * 24 + row.steamSyncIntervalHours,
+        autoQueueNewImports: row.autoQueueNewImports,
+      }));
+
+    return {
+      checkedCount: rows.length,
+      dueAccounts,
+    };
+  });
+}
+
+export async function recordSteamAutoRefreshFailure(input: {
+  user: AppUser;
+  steamAccountId: string;
+  errorMessage: string;
+}) {
+  if (!isDatabaseConfigured()) return;
+
+  await withUserDb(input.user, async (tx) => {
+    await tx.insert(syncRuns).values({
+      userId: input.user.id,
+      steamAccountId: input.steamAccountId,
+      syncType: "library",
+      completedAt: new Date(),
+      status: "failed",
+      errorMessage: input.errorMessage,
+      notes: "Source: scheduled Steam auto-refresh",
+    });
   });
 }
 
@@ -1207,6 +1305,9 @@ function mapSettings(row: typeof appSettings.$inferSelect): AppSettings {
     inProgressAddsToRotationWhenSpace: row.inProgressAddsToRotationWhenSpace,
     autoQueueNewImports: row.autoQueueNewImports,
     protectManualFieldsFromSync: row.protectManualFieldsFromSync,
+    steamAutoSyncEnabled: row.steamAutoSyncEnabled,
+    steamSyncIntervalDays: row.steamSyncIntervalDays,
+    steamSyncIntervalHours: row.steamSyncIntervalHours,
     queueSlidingWindowSize: row.queueSlidingWindowSize,
     rotationSkipCooldownDays: row.rotationSkipCooldownDays,
     rotationSkipLimit: row.rotationSkipLimit,
@@ -1228,6 +1329,9 @@ function settingsToDb(settings: Partial<AppSettings>) {
     inProgressAddsToRotationWhenSpace: settings.inProgressAddsToRotationWhenSpace,
     autoQueueNewImports: settings.autoQueueNewImports,
     protectManualFieldsFromSync: settings.protectManualFieldsFromSync,
+    steamAutoSyncEnabled: settings.steamAutoSyncEnabled,
+    steamSyncIntervalDays: settings.steamSyncIntervalDays,
+    steamSyncIntervalHours: settings.steamSyncIntervalHours,
     queueSlidingWindowSize: settings.queueSlidingWindowSize,
     rotationSkipCooldownDays: settings.rotationSkipCooldownDays,
     rotationSkipLimit: settings.rotationSkipLimit,

@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 
 import {
+  parseIntegerInRange,
+  parseNonnegativeInteger,
   parseOptionalPositiveInteger,
   parsePositiveInteger,
   type AutoSaveResult,
@@ -47,6 +49,14 @@ export async function autoSaveSettingsFieldAction(
       const parsed = parsePositiveInteger(input.value, "Check-in interval hours played", 1);
       if (!parsed.ok) return parsed;
       patch.checkinIntervalHoursPlayed = parsed.value;
+    } else if (input.field === "steamSyncIntervalDays") {
+      const parsed = parseNonnegativeInteger(input.value, "Steam refresh interval days");
+      if (!parsed.ok) return parsed;
+      patch.steamSyncIntervalDays = parsed.value;
+    } else if (input.field === "steamSyncIntervalHours") {
+      const parsed = parseIntegerInRange(input.value, "Steam refresh interval hours", 0, 23);
+      if (!parsed.ok) return parsed;
+      patch.steamSyncIntervalHours = parsed.value;
     } else if (input.field === "queueSlidingWindowSize") {
       const parsed = parsePositiveInteger(input.value, "Queue sliding window size", 3);
       if (!parsed.ok) return parsed;
@@ -85,6 +95,8 @@ export async function updateSettingsAction(formData: FormData) {
     maxInstalledCount: maxInstalled ? Number(maxInstalled) : null,
     checkinIntervalDays: Number(formData.get("checkinIntervalDays") ?? 7),
     checkinIntervalHoursPlayed: Number(formData.get("checkinIntervalHoursPlayed") ?? 2),
+    steamSyncIntervalDays: Number(formData.get("steamSyncIntervalDays") ?? 1),
+    steamSyncIntervalHours: Number(formData.get("steamSyncIntervalHours") ?? 0),
     queueSlidingWindowSize: Number(formData.get("queueSlidingWindowSize") ?? 5),
     rotationSkipCooldownDays: Number(formData.get("rotationSkipCooldownDays") ?? 90),
     rotationSkipLimit: Number(formData.get("rotationSkipLimit") ?? 3),
@@ -95,6 +107,7 @@ export async function updateSettingsAction(formData: FormData) {
     inProgressSetsInstalledTrue: formData.get("inProgressSetsInstalledTrue") === "on",
     inProgressAddsToRotationWhenSpace: formData.get("inProgressAddsToRotationWhenSpace") === "on",
     autoQueueNewImports: formData.get("autoQueueNewImports") === "on",
+    steamAutoSyncEnabled: formData.get("steamAutoSyncEnabled") === "on",
     protectManualFieldsFromSync: formData.get("protectManualFieldsFromSync") === "on",
   });
   revalidateSettings();

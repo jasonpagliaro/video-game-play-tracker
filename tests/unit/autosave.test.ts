@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   gameIsVisibleInTable,
   getGameDestination,
+  parseIntegerInRange,
+  parseNonnegativeInteger,
   parseOptionalPositiveInteger,
   parsePositiveInteger,
   type GameVisibilitySnapshot,
@@ -36,6 +38,10 @@ describe("auto-save parsing", () => {
     expect(parsePositiveInteger("", "Max active rotation", 1).ok).toBe(false);
     expect(parseOptionalPositiveInteger("", "Max installed warning count", 1)).toEqual({ ok: true, value: null });
     expect(parseOptionalPositiveInteger("2", "Max installed warning count", 1)).toEqual({ ok: true, value: 2 });
+    expect(parseNonnegativeInteger("0", "Steam refresh interval days")).toEqual({ ok: true, value: 0 });
+    expect(parseNonnegativeInteger("-1", "Steam refresh interval days").ok).toBe(false);
+    expect(parseIntegerInRange("23", "Steam refresh interval hours", 0, 23)).toEqual({ ok: true, value: 23 });
+    expect(parseIntegerInRange("24", "Steam refresh interval hours", 0, 23).ok).toBe(false);
   });
 });
 

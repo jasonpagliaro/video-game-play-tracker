@@ -12,6 +12,10 @@ export function getSteamApiKey() {
   return (process.env.STEAM_API_KEY ?? "").trim();
 }
 
+export function getCronSecret() {
+  return (process.env.CRON_SECRET ?? "").trim();
+}
+
 export function getAllowedEmails() {
   return (process.env.APP_ALLOWED_EMAILS ?? "")
     .split(",")

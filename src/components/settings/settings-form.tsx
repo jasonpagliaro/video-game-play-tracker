@@ -83,6 +83,33 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
           />
         </CardContent>
       </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Steam auto-refresh</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <BooleanField
+            name="steamAutoSyncEnabled"
+            label="Automatically refresh saved Steam accounts"
+            checked={settings.steamAutoSyncEnabled}
+          />
+          <div className="grid gap-4 md:grid-cols-2">
+            <NumberField
+              name="steamSyncIntervalDays"
+              label="Refresh interval days"
+              defaultValue={settings.steamSyncIntervalDays}
+              min={0}
+            />
+            <NumberField
+              name="steamSyncIntervalHours"
+              label="Refresh interval hours"
+              defaultValue={settings.steamSyncIntervalHours}
+              min={0}
+              max={23}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -91,10 +118,14 @@ function NumberField({
   name,
   label,
   defaultValue,
+  min,
+  max,
 }: {
   name: NumberSettingField;
   label: string;
   defaultValue: number | string;
+  min?: number;
+  max?: number;
 }) {
   const router = useRouter();
   const field = useAutoSaveField<string, { field: AutoSaveSettingsFieldInput["field"] }>({
@@ -113,6 +144,8 @@ function NumberField({
         id={name}
         value={field.value}
         type="number"
+        min={min}
+        max={max}
         onChange={(event) => field.setAndScheduleSave(event.target.value)}
         onBlur={field.flush}
       />

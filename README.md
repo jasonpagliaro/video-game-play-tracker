@@ -2,7 +2,7 @@
 
 A personal Steam backlog execution tool built with Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Supabase Auth, Supabase Postgres, and Drizzle.
 
-Phase 1 includes Steam library sync, CSV import, backlog views, status transitions, active rotation limits, replacement workflow, queue ranking, category-aware queue insertion, settings, and core tests. Store metadata enrichment, achievements sync, check-ins, milestones, drag-and-drop queue, scheduled sync, and AI recommendations are intentionally deferred to later phases.
+Phase 1 includes Steam library sync, scheduled Steam refresh, CSV import, backlog views, status transitions, active rotation limits, replacement workflow, queue ranking, category-aware queue insertion, settings, and core tests. Store metadata enrichment, achievements sync, check-ins, milestones, drag-and-drop queue, and AI recommendations are intentionally deferred to later phases.
 
 ## Setup
 
@@ -28,6 +28,7 @@ Use `npm install` only when intentionally changing dependencies. If the local in
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
    - `APP_ALLOWED_EMAILS`
    - `STEAM_API_KEY`
+   - `CRON_SECRET`
 4. Apply the initial SQL migration in `src/db/migrations/0000_initial.sql` through Supabase SQL editor or `npm run db:migrate`.
 5. Run the app:
 
@@ -98,6 +99,12 @@ The Steam sync accepts a SteamID64, `steamcommunity.com/profiles/:id` URL, `stea
 This sync imports library-level data plus best-effort Steam Store metadata: app id, title, total and platform playtime, last played, owner SteamID64, Store genres/categories, release year, review score, and sync timestamps. Store metadata failures do not block library sync, and the app does not use AI.
 
 Steam libraries must be visible to the API. Empty/private-library results are safe: applying one will not mark existing owned games as missing from the latest sync.
+
+## Scheduled Steam Refresh
+
+The app includes a secured Vercel Cron route at `/api/cron/steam-refresh`. It refreshes saved Steam accounts when their per-user Settings cadence is due. The cadence is configured as days plus hours, defaults to 1 day, and is enabled by default after a Steam account has been synced.
+
+Set `CRON_SECRET` in Vercel. The cron route requires `Authorization: Bearer $CRON_SECRET`. The committed `vercel.json` uses an hourly trigger so hour-level cadences can be honored; Vercel Hobby plans only support daily cron schedules.
 
 ## Deployment
 

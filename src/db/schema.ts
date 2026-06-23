@@ -62,6 +62,9 @@ export const appSettings = pgTable(
       .default(true),
     autoQueueNewImports: boolean("auto_queue_new_imports").notNull().default(false),
     protectManualFieldsFromSync: boolean("protect_manual_fields_from_sync").notNull().default(true),
+    steamAutoSyncEnabled: boolean("steam_auto_sync_enabled").notNull().default(true),
+    steamSyncIntervalDays: integer("steam_sync_interval_days").notNull().default(1),
+    steamSyncIntervalHours: integer("steam_sync_interval_hours").notNull().default(0),
     queueSlidingWindowSize: integer("queue_sliding_window_size").notNull().default(5),
     rotationSkipCooldownDays: integer("rotation_skip_cooldown_days").notNull().default(90),
     rotationSkipLimit: integer("rotation_skip_limit").notNull().default(3),
@@ -75,6 +78,15 @@ export const appSettings = pgTable(
     check("app_settings_rotation_skip_cooldown_positive", sql`${table.rotationSkipCooldownDays} > 0`),
     check("app_settings_rotation_skip_limit_positive", sql`${table.rotationSkipLimit} > 0`),
     check("app_settings_parked_reassessment_positive", sql`${table.parkedReassessmentDays} > 0`),
+    check("app_settings_steam_sync_days_nonnegative", sql`${table.steamSyncIntervalDays} >= 0`),
+    check(
+      "app_settings_steam_sync_hours_range",
+      sql`${table.steamSyncIntervalHours} >= 0 and ${table.steamSyncIntervalHours} <= 23`,
+    ),
+    check(
+      "app_settings_steam_sync_interval_positive",
+      sql`${table.steamSyncIntervalDays} > 0 or ${table.steamSyncIntervalHours} > 0`,
+    ),
   ],
 );
 

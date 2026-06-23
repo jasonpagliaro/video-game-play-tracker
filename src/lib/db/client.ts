@@ -12,6 +12,8 @@ export type AppUser = {
   accessToken?: string;
 };
 
+type DbTransaction = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
 let client: postgres.Sql | null = null;
 let db: PostgresJsDatabase<typeof schema> | null = null;
 let runtimeSchemaPromise: Promise<void> | null = null;
@@ -31,7 +33,7 @@ export function getDb() {
 
 export async function withUserDb<T>(
   user: AppUser,
-  callback: (tx: Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0]) => Promise<T>,
+  callback: (tx: DbTransaction) => Promise<T>,
 ) {
   const database = getDb();
   await ensureRuntimeSchema(database);
@@ -45,6 +47,12 @@ export async function withUserDb<T>(
     await tx.execute(sql.raw("set local role authenticated"));
     return callback(tx);
   });
+}
+
+export async function withSystemDb<T>(callback: (tx: DbTransaction) => Promise<T>) {
+  const database = getDb();
+  await ensureRuntimeSchema(database);
+  return database.transaction(callback);
 }
 
 async function ensureRuntimeSchema(database: PostgresJsDatabase<typeof schema>) {
@@ -62,13 +70,16 @@ async function ensureRuntimeSchema(database: PostgresJsDatabase<typeof schema>) 
 
 async function runRuntimeSchemaBootstrap(database: PostgresJsDatabase<typeof schema>) {
   await database.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('video_game_play_tracker_schema_0002')::bigint)`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('video_game_play_tracker_schema_0003')::bigint)`);
     await tx.execute(sql.raw("alter type game_status add value if not exists 'done_for_now'"));
     await tx.execute(sql.raw(`
       alter table app_settings
         add column if not exists rotation_skip_cooldown_days integer not null default 90,
         add column if not exists rotation_skip_limit integer not null default 3,
-        add column if not exists parked_reassessment_days integer not null default 180
+        add column if not exists parked_reassessment_days integer not null default 180,
+        add column if not exists steam_auto_sync_enabled boolean not null default true,
+        add column if not exists steam_sync_interval_days integer not null default 1,
+        add column if not exists steam_sync_interval_hours integer not null default 0
     `));
     await tx.execute(sql.raw(`
       do $$
@@ -98,6 +109,37 @@ async function runRuntimeSchemaBootstrap(database: PostgresJsDatabase<typeof sch
         ) then
           alter table app_settings
             add constraint app_settings_parked_reassessment_positive check (parked_reassessment_days > 0);
+        end if;
+
+        if not exists (
+          select 1 from pg_constraint
+          where conrelid = 'app_settings'::regclass
+            and conname = 'app_settings_steam_sync_days_nonnegative'
+        ) then
+          alter table app_settings
+            add constraint app_settings_steam_sync_days_nonnegative check (steam_sync_interval_days >= 0);
+        end if;
+
+        if not exists (
+          select 1 from pg_constraint
+          where conrelid = 'app_settings'::regclass
+            and conname = 'app_settings_steam_sync_hours_range'
+        ) then
+          alter table app_settings
+            add constraint app_settings_steam_sync_hours_range check (
+              steam_sync_interval_hours >= 0 and steam_sync_interval_hours <= 23
+            );
+        end if;
+
+        if not exists (
+          select 1 from pg_constraint
+          where conrelid = 'app_settings'::regclass
+            and conname = 'app_settings_steam_sync_interval_positive'
+        ) then
+          alter table app_settings
+            add constraint app_settings_steam_sync_interval_positive check (
+              steam_sync_interval_days > 0 or steam_sync_interval_hours > 0
+            );
         end if;
       end
       $$

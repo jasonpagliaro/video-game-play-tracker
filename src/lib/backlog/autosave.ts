@@ -71,6 +71,8 @@ export type AutoSaveSettingsFieldInput =
   | { field: "maxInstalledCount"; value: string }
   | { field: "checkinIntervalDays"; value: string }
   | { field: "checkinIntervalHoursPlayed"; value: string }
+  | { field: "steamSyncIntervalDays"; value: string }
+  | { field: "steamSyncIntervalHours"; value: string }
   | { field: "queueSlidingWindowSize"; value: string }
   | { field: "rotationSkipCooldownDays"; value: string }
   | { field: "rotationSkipLimit"; value: string }
@@ -81,6 +83,7 @@ export type AutoSaveSettingsFieldInput =
   | { field: "inProgressSetsInstalledTrue"; value: boolean }
   | { field: "inProgressAddsToRotationWhenSpace"; value: boolean }
   | { field: "autoQueueNewImports"; value: boolean }
+  | { field: "steamAutoSyncEnabled"; value: boolean }
   | { field: "protectManualFieldsFromSync"; value: boolean };
 
 const TERMINAL_PARKING_EXCLUSIONS = new Set<GameStatus>([
@@ -129,6 +132,35 @@ export function parseOptionalPositiveInteger(
 ): AutoSaveResult<number | null> {
   if (!value.trim()) return { ok: true, value: null };
   return parsePositiveInteger(value, label, min);
+}
+
+export function parseNonnegativeInteger(
+  value: string,
+  label: string,
+): AutoSaveResult<number> {
+  const trimmed = value.trim();
+  const parsed = Number(trimmed);
+  if (!trimmed || !Number.isFinite(parsed) || !Number.isInteger(parsed)) {
+    return { ok: false, message: `${label} must be a whole number.` };
+  }
+  if (parsed < 0) {
+    return { ok: false, message: `${label} must be at least 0.` };
+  }
+  return { ok: true, value: parsed };
+}
+
+export function parseIntegerInRange(
+  value: string,
+  label: string,
+  min: number,
+  max: number,
+): AutoSaveResult<number> {
+  const parsed = parseNonnegativeInteger(value, label);
+  if (!parsed.ok) return parsed;
+  if (parsed.value < min || parsed.value > max) {
+    return { ok: false, message: `${label} must be from ${min} to ${max}.` };
+  }
+  return parsed;
 }
 
 export function getDefaultVisibilityScope(

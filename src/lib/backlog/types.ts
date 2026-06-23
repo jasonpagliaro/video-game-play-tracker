@@ -20,6 +20,9 @@ export type AppSettings = {
   inProgressAddsToRotationWhenSpace: boolean;
   autoQueueNewImports: boolean;
   protectManualFieldsFromSync: boolean;
+  steamAutoSyncEnabled: boolean;
+  steamSyncIntervalDays: number;
+  steamSyncIntervalHours: number;
   queueSlidingWindowSize: number;
   rotationSkipCooldownDays: number;
   rotationSkipLimit: number;
