@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ChevronDown, Download, ExternalLink, Play } from "lucide-react";
 
@@ -47,11 +48,11 @@ export function DashboardGameCard({
                 </Badge>
               ) : null}
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <DashboardBadgeStrip>
               <StatusBadge status={game.status} />
               <SlotBadge slot={game.backlogSlot} />
               <CompletionTypeBadge completionType={game.completionType} />
-            </div>
+            </DashboardBadgeStrip>
           </div>
 
           <div className="grid grid-cols-4 gap-1.5 rounded-md bg-muted/60 p-2 text-[11px]">
@@ -118,11 +119,11 @@ export function DashboardGameCard({
               </Badge>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <DashboardBadgeStrip>
             <StatusBadge status={game.status} />
             <SlotBadge slot={game.backlogSlot} />
             <CompletionTypeBadge completionType={game.completionType} />
-          </div>
+          </DashboardBadgeStrip>
         </CardContent>
       </Card>
     );
@@ -143,11 +144,11 @@ export function DashboardGameCard({
               </Badge>
             ) : null}
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <DashboardBadgeStrip>
             <StatusBadge status={game.status} />
             <SlotBadge slot={game.backlogSlot} />
             <CompletionTypeBadge completionType={game.completionType} />
-          </div>
+          </DashboardBadgeStrip>
         </div>
 
         <details className="group/details grid gap-3">
@@ -204,6 +205,14 @@ function Metric({ label, value }: { label: string; value: string }) {
     <div className="min-w-0">
       <div className="truncate text-muted-foreground">{label}</div>
       <div className="truncate font-mono text-foreground">{value}</div>
+    </div>
+  );
+}
+
+function DashboardBadgeStrip({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-[2.875rem] flex-wrap content-start gap-1.5 overflow-hidden">
+      {children}
     </div>
   );
 }
