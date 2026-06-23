@@ -28,7 +28,7 @@ export function GameIdentityBanner({
   return (
     <div
       className={cn(
-        "relative aspect-[92/43] overflow-hidden rounded-t-lg bg-muted text-muted-foreground",
+        "relative aspect-[92/43] shrink-0 overflow-hidden rounded-t-lg bg-muted text-muted-foreground",
         className,
       )}
     >
@@ -38,9 +38,9 @@ export function GameIdentityBanner({
           alt={`${title} Steam header artwork`}
           width={STEAM_HEADER_IMAGE_WIDTH}
           height={STEAM_HEADER_IMAGE_HEIGHT}
-          sizes="(min-width: 1280px) 360px, (min-width: 768px) 45vw, 100vw"
+          sizes="(min-width: 1280px) 20vw, (min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw"
           priority={priority}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain"
           onError={() => setFailedSteamAppId(steamAppId)}
         />
       ) : (

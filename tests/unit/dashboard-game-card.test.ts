@@ -59,6 +59,12 @@ describe("DashboardGameCard", () => {
     const html = renderToStaticMarkup(createElement(DashboardGameCard, { game, variant: "compact" }));
 
     expect(html).toContain('data-dashboard-card-variant="compact"');
+    expect(html).toContain("aspect-[92/43]");
+    expect(html).toContain("object-contain");
+    expect(html).toContain("(min-width: 1280px) 20vw");
+    expect(html).not.toContain("object-cover");
+    expect(html).not.toContain("h-24");
+    expect(html).not.toContain("sm:h-28");
     expect(html).toContain("10,000,000");
     expect(html).toContain("Not Started");
     expect(html).toContain("Short / Palate Cleanser");
@@ -77,6 +83,12 @@ describe("DashboardGameCard", () => {
     const slotIndex = html.indexOf("Short / Palate Cleanser", badgeStripIndex);
 
     expect(html).toContain('data-dashboard-card-variant="active"');
+    expect(html).toContain("aspect-[92/43]");
+    expect(html).toContain("object-contain");
+    expect(html).toContain("(min-width: 1280px) 20vw");
+    expect(html).not.toContain("object-cover");
+    expect(html).not.toContain("h-20");
+    expect(html).not.toContain("xl:h-16");
     expect(badgeStripIndex).toBeGreaterThan(-1);
     expect(statusIndex).toBeGreaterThan(badgeStripIndex);
     expect(completionIndex).toBeGreaterThan(statusIndex);

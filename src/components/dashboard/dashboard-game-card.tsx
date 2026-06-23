@@ -33,7 +33,7 @@ export function DashboardGameCard({
           steamAppId={game.steamAppId}
           title={game.title}
           priority={priorityImage}
-          className="h-20 rounded-t-lg xl:h-16 2xl:h-20"
+          className="rounded-t-lg"
         />
         <CardContent className="grid gap-2 pt-0">
           <div className="grid gap-1.5">
@@ -101,7 +101,7 @@ export function DashboardGameCard({
           steamAppId={game.steamAppId}
           title={game.title}
           priority={priorityImage}
-          className="h-24 rounded-t-lg sm:h-28 xl:h-24 2xl:h-28"
+          className="rounded-t-lg"
         />
         <CardContent className="grid gap-2 pt-0">
           <div className="flex min-w-0 items-start justify-between gap-2">
