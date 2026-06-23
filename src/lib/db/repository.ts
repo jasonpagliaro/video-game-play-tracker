@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, notInArray, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, notInArray, sql } from "drizzle-orm";
 
 import {
   appSettings,
@@ -46,7 +46,14 @@ import {
 } from "@/lib/backlog/rotation-fill";
 import { transitionGameStatus } from "@/lib/backlog/status";
 import type { GameVisibilitySnapshot } from "@/lib/backlog/autosave";
-import type { AppSettings, Game, GameSummary, ParsedCsvGame, QueueCandidate } from "@/lib/backlog/types";
+import type {
+  AppSettings,
+  Game,
+  GameStatusHistoryEntry,
+  GameSummary,
+  ParsedCsvGame,
+  QueueCandidate,
+} from "@/lib/backlog/types";
 import { isDatabaseConfigured } from "@/lib/env";
 import { fetchSteamStoreMetadataForAppIds } from "@/lib/steam/client";
 import type { SteamLibraryGame, SteamLibrarySyncData } from "@/lib/steam/library";
@@ -164,6 +171,18 @@ export async function getGame(user: AppUser, id: string): Promise<Game | null> {
       where: and(eq(games.userId, user.id), eq(games.id, id)),
     });
     return row ? mapGame(row) : null;
+  });
+}
+
+export async function getGameStatusHistory(user: AppUser, gameId: string): Promise<GameStatusHistoryEntry[]> {
+  if (!isDatabaseConfigured()) return [];
+  return withUserDb(user, async (tx) => {
+    const rows = await tx
+      .select()
+      .from(statusHistory)
+      .where(and(eq(statusHistory.userId, user.id), eq(statusHistory.gameId, gameId)))
+      .orderBy(desc(statusHistory.changedAt));
+    return rows.map(mapStatusHistoryEntry);
   });
 }
 
@@ -1428,6 +1447,16 @@ function mapGameSummary(row: GameRow): GameSummary {
     steamid64Owner: game.steamid64Owner,
     notes: game.notes,
     dnfReason: game.dnfReason,
+  };
+}
+
+function mapStatusHistoryEntry(row: typeof statusHistory.$inferSelect): GameStatusHistoryEntry {
+  return {
+    id: row.id,
+    previousStatus: row.previousStatus,
+    newStatus: row.newStatus,
+    changedAt: row.changedAt,
+    notes: row.notes,
   };
 }
 

@@ -117,6 +117,14 @@ export type GameSummary = Pick<
   | "dnfReason"
 >;
 
+export type GameStatusHistoryEntry = {
+  id: string;
+  previousStatus: GameStatus | null;
+  newStatus: GameStatus;
+  changedAt: Date;
+  notes: string | null;
+};
+
 export type CsvMapping = Record<string, string | null>;
 
 export type CsvPreviewRow = {

@@ -16,8 +16,20 @@ export function formatDate(date: Date | string | null | undefined) {
   });
 }
 
+export function formatDateTime(date: Date | string | null | undefined) {
+  if (!date) return "-";
+  const parsed = typeof date === "string" ? new Date(date) : date;
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return parsed.toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function formatPercent(value: number | null | undefined) {
   if (value == null) return "-";
   return `${Math.round(value)}%`;
 }
-
