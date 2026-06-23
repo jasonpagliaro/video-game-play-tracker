@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import Link from "next/link";
 import { ArrowUpRight, ChevronDown, Download, ExternalLink, Play } from "lucide-react";
 
@@ -48,14 +47,10 @@ export function DashboardGameCard({
                 </Badge>
               ) : null}
             </div>
-            <DashboardBadgeStrip>
-              <StatusBadge status={game.status} />
-              <SlotBadge slot={game.backlogSlot} />
-              <CompletionTypeBadge completionType={game.completionType} />
-            </DashboardBadgeStrip>
+            <DashboardBadgeStrip game={game} layout="active" />
           </div>
 
-          <div className="grid grid-cols-4 gap-1.5 rounded-md bg-muted/60 p-2 text-[11px]">
+          <div data-dashboard-metrics="active" className="grid grid-cols-4 gap-1.5 rounded-md bg-muted/60 p-2 text-[11px]">
             <Metric label="Played" value={formatMinutes(game.playtimeMinutes)} />
             <Metric label="Ach" value={formatPercent(game.achievementPercent)} />
             <Metric label="Est" value={game.estimatedHours ? `${game.estimatedHours}h` : "-"} />
@@ -79,7 +74,7 @@ export function DashboardGameCard({
             </div>
           </div>
           {steamInstallUrl && steamLaunchUrl ? (
-            <div className="grid grid-cols-2 gap-1.5">
+            <div data-dashboard-actions="active" className="grid grid-cols-2 gap-1.5">
               <Button asChild size="sm" variant="outline" className="min-w-0 px-2 text-xs">
                 <a href={steamInstallUrl} aria-label={`Install ${game.title} in Steam`}>
                   <Download className="h-3.5 w-3.5" aria-hidden="true" />
@@ -119,11 +114,7 @@ export function DashboardGameCard({
               </Badge>
             ) : null}
           </div>
-          <DashboardBadgeStrip>
-            <StatusBadge status={game.status} />
-            <SlotBadge slot={game.backlogSlot} />
-            <CompletionTypeBadge completionType={game.completionType} />
-          </DashboardBadgeStrip>
+          <DashboardBadgeStrip game={game} />
         </CardContent>
       </Card>
     );
@@ -144,11 +135,7 @@ export function DashboardGameCard({
               </Badge>
             ) : null}
           </div>
-          <DashboardBadgeStrip>
-            <StatusBadge status={game.status} />
-            <SlotBadge slot={game.backlogSlot} />
-            <CompletionTypeBadge completionType={game.completionType} />
-          </DashboardBadgeStrip>
+          <DashboardBadgeStrip game={game} />
         </div>
 
         <details className="group/details grid gap-3">
@@ -209,10 +196,32 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function DashboardBadgeStrip({ children }: { children: ReactNode }) {
+function DashboardBadgeStrip({
+  game,
+  layout = "default",
+}: {
+  game: Pick<GameSummary, "status" | "backlogSlot" | "completionType">;
+  layout?: "default" | "active";
+}) {
+  if (layout === "active") {
+    return (
+      <div data-dashboard-badge-strip="active" className="grid min-h-[2.875rem] content-start gap-1.5 overflow-hidden">
+        <div data-dashboard-badge-row="state" className="flex min-w-0 flex-nowrap gap-1.5 overflow-hidden">
+          <StatusBadge status={game.status} />
+          <CompletionTypeBadge completionType={game.completionType} />
+        </div>
+        <div data-dashboard-badge-row="slot" className="flex min-w-0 overflow-hidden">
+          <SlotBadge slot={game.backlogSlot} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-[2.875rem] flex-wrap content-start gap-1.5 overflow-hidden">
-      {children}
+    <div data-dashboard-badge-strip="default" className="flex min-h-[2.875rem] flex-wrap content-start gap-1.5 overflow-hidden">
+      <StatusBadge status={game.status} />
+      <SlotBadge slot={game.backlogSlot} />
+      <CompletionTypeBadge completionType={game.completionType} />
     </div>
   );
 }

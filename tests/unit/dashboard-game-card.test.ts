@@ -71,8 +71,20 @@ describe("DashboardGameCard", () => {
 
   it("renders active cards with inline progress and actions", () => {
     const html = renderToStaticMarkup(createElement(DashboardGameCard, { game, variant: "active" }));
+    const badgeStripIndex = html.indexOf('data-dashboard-badge-strip="active"');
+    const statusIndex = html.indexOf("Not Started", badgeStripIndex);
+    const completionIndex = html.indexOf("Needs Type", badgeStripIndex);
+    const slotIndex = html.indexOf("Short / Palate Cleanser", badgeStripIndex);
 
     expect(html).toContain('data-dashboard-card-variant="active"');
+    expect(badgeStripIndex).toBeGreaterThan(-1);
+    expect(statusIndex).toBeGreaterThan(badgeStripIndex);
+    expect(completionIndex).toBeGreaterThan(statusIndex);
+    expect(slotIndex).toBeGreaterThan(completionIndex);
+    expect(html).toContain('data-dashboard-badge-row="state"');
+    expect(html).toContain('data-dashboard-badge-row="slot"');
+    expect(html).toContain('data-dashboard-metrics="active"');
+    expect(html).toContain('data-dashboard-actions="active"');
     expect(html).toContain("10,000,000");
     expect(html).toContain("Played");
     expect(html).toContain("10m");
