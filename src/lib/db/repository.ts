@@ -309,7 +309,9 @@ export async function updateGameFields(
 ) {
   if (!isDatabaseConfigured()) throw new Error("DATABASE_URL is not configured.");
   return withUserDb(user, async (tx) => {
-    await tx
+    const queueSensitive =
+      fields.backlogSlot || fields.completionType || fields.personalInterest || fields.queueLocked != null;
+    const [updated] = await tx
       .update(games)
       .set({
         ...fields,
@@ -317,10 +319,14 @@ export async function updateGameFields(
         manualCompletionType: fields.completionType ? true : undefined,
         updatedAt: new Date(),
       })
-      .where(and(eq(games.userId, user.id), eq(games.id, gameId)));
-    if (fields.backlogSlot || fields.completionType || fields.personalInterest || fields.queueLocked != null) {
+      .where(and(eq(games.userId, user.id), eq(games.id, gameId)))
+      .returning({ queueRank: games.queueRank });
+    if (!updated) throw new Error("Game not found.");
+    const rebalanced = Boolean(queueSensitive && updated.queueRank != null);
+    if (rebalanced) {
       await rebalanceQueueRanks(tx, user.id);
     }
+    return { rebalanced };
   });
 }
 
@@ -383,7 +389,7 @@ export async function bulkUpdateGames(input: {
         .update(games)
         .set({ backlogSlot: input.backlogSlot, manualBacklogSlot: true, updatedAt: new Date() })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
-      await rebalanceQueueRanks(tx, input.user.id);
+      if (selected.some((game) => game.queueRank != null)) await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -392,7 +398,7 @@ export async function bulkUpdateGames(input: {
         .update(games)
         .set({ completionType: input.completionType, manualCompletionType: true, updatedAt: new Date() })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
-      await rebalanceQueueRanks(tx, input.user.id);
+      if (selected.some((game) => game.queueRank != null)) await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -401,7 +407,7 @@ export async function bulkUpdateGames(input: {
         .update(games)
         .set({ personalInterest: input.personalInterest, updatedAt: new Date() })
         .where(and(eq(games.userId, input.user.id), inArray(games.id, gameIds)));
-      await rebalanceQueueRanks(tx, input.user.id);
+      if (selected.some((game) => game.queueRank != null)) await rebalanceQueueRanks(tx, input.user.id);
       return;
     }
 
@@ -1217,22 +1223,33 @@ async function rebalanceQueueRanks(tx: Tx, userId: string) {
     where: and(eq(games.userId, userId), sql`${games.queueRank} is not null`),
     orderBy: [asc(games.queueRank)],
   });
+  const existingRanks = new Map(queueRows.map((game) => [game.id, game.queueRank]));
   const { queue } = rebalanceQueueLogic(queueRows.map(mapQueueCandidate), {
     windowSize: settingsRow?.queueSlidingWindowSize ?? DEFAULT_QUEUE_WINDOW_SIZE,
   });
-  await persistQueueRanks(tx, userId, queue);
+  await persistQueueRanks(tx, userId, queue, existingRanks);
 }
 
-async function persistQueueRanks(tx: Tx, userId: string, queue: QueueCandidate[]) {
+async function persistQueueRanks(
+  tx: Tx,
+  userId: string,
+  queue: QueueCandidate[],
+  existingRanks?: Map<string, number | null>,
+) {
   const movable = queue.filter((item) => !item.queueLocked && item.queueRank != null);
+  const ranksToPersist = existingRanks
+    ? movable.filter((item) => existingRanks.get(item.id) !== item.queueRank)
+    : movable;
+  if (ranksToPersist.length === 0) return;
+
   const now = new Date();
-  for (let index = 0; index < movable.length; index += 1) {
+  for (let index = 0; index < ranksToPersist.length; index += 1) {
     await tx
       .update(games)
       .set({ queueRank: -(index + 1) * 1000000, updatedAt: now })
-      .where(and(eq(games.userId, userId), eq(games.id, movable[index].id)));
+      .where(and(eq(games.userId, userId), eq(games.id, ranksToPersist[index].id)));
   }
-  for (const item of movable) {
+  for (const item of ranksToPersist) {
     await tx
       .update(games)
       .set({ queueRank: item.queueRank, updatedAt: now })

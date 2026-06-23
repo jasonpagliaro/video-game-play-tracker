@@ -49,6 +49,10 @@ function revalidateApp(gameId?: string) {
   if (gameId) revalidatePath(`/games/${gameId}`);
 }
 
+function revalidateGame(gameId: string) {
+  revalidatePath(`/games/${gameId}`);
+}
+
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to save change.";
 }
@@ -65,6 +69,7 @@ export async function autoSaveGameFieldAction(
   const user = await requireUser();
   try {
     if (!input?.gameId) return { ok: false, message: "Game is missing." };
+    let revalidateFullApp = true;
 
     if (input.field === "status") {
       if (!isGameStatus(String(input.value))) return { ok: false, message: "Invalid status." };
@@ -83,7 +88,8 @@ export async function autoSaveGameFieldAction(
       await updateGameFields(user, input.gameId, { completionType: input.value });
     } else if (input.field === "personalInterest") {
       if (!isPersonalInterest(String(input.value))) return { ok: false, message: "Invalid interest." };
-      await updateGameFields(user, input.gameId, { personalInterest: input.value });
+      const { rebalanced } = await updateGameFields(user, input.gameId, { personalInterest: input.value });
+      revalidateFullApp = rebalanced;
     } else if (input.field === "notes") {
       await updateGameFields(user, input.gameId, { notes: input.value.trim() ? input.value : null });
     } else if (input.field === "dnfReason") {
@@ -98,7 +104,11 @@ export async function autoSaveGameFieldAction(
       return { ok: false, message: "Unsupported field." };
     }
 
-    revalidateApp();
+    if (revalidateFullApp) {
+      revalidateApp(input.gameId);
+    } else {
+      revalidateGame(input.gameId);
+    }
     return { ok: true, value: await snapshotForSavedGame(user, input.gameId) };
   } catch (error) {
     return { ok: false, message: errorMessage(error) };

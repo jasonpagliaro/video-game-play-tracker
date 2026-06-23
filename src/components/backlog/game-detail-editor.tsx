@@ -68,7 +68,6 @@ export function GameDetailEditor({
   const personalInterest = useAutoSaveField<PersonalInterest, GameVisibilitySnapshot>({
     initialValue: game.personalInterest,
     save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "personalInterest", value }),
-    onSaved,
   });
   const dnfReason = useAutoSaveField<string, GameVisibilitySnapshot>({
     initialValue: game.dnfReason ?? "",
