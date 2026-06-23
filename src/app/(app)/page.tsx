@@ -11,6 +11,7 @@ import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { requireUser } from "@/lib/auth";
 import { getDashboardSummary } from "@/lib/backlog/dashboard";
 import { formatMinutes } from "@/lib/backlog/format";
@@ -147,10 +148,10 @@ function OpenSlotCard({
             </div>
             <form action={addRotationSuggestionToRotationAction}>
               <input type="hidden" name="gameId" value={candidate.id} />
-              <Button type="submit" size="sm" className="w-full justify-center gap-1">
+              <PendingSubmitButton size="sm" className="w-full justify-center gap-1" pendingLabel="Adding...">
                 <Plus className="h-3.5 w-3.5" />
                 Add to rotation
-              </Button>
+              </PendingSubmitButton>
             </form>
           </>
         ) : (

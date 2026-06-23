@@ -3,8 +3,8 @@ import Link from "next/link";
 import { CircleSlash, ParkingCircle, Plus, RotateCw, SkipForward, TriangleAlert } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { formatDate, formatMinutes } from "@/lib/backlog/format";
 import {
   getOpenRotationSlots,
@@ -50,10 +50,10 @@ export function RotationFillPanel({
         </CardDescription>
         <CardAction>
           <form action={fillRotationFromQueueAction}>
-            <Button type="submit" size="sm" disabled={candidates.length === 0}>
+            <PendingSubmitButton size="sm" disabled={candidates.length === 0} pendingLabel="Filling...">
               <RotateCw className="h-4 w-4" />
               Fill open slots
-            </Button>
+            </PendingSubmitButton>
           </form>
         </CardAction>
       </CardHeader>
@@ -114,30 +114,30 @@ function RotationSuggestionRow({
       </div>
       <div className="flex flex-wrap gap-2 lg:justify-end">
         <GameActionForm action={addRotationSuggestionToRotationAction} gameId={game.id}>
-          <Button type="submit" size="sm" className="gap-1">
+          <PendingSubmitButton size="sm" className="gap-1" pendingLabel="Adding...">
             <Plus className="h-3.5 w-3.5" />
             Add
-          </Button>
+          </PendingSubmitButton>
         </GameActionForm>
         {!decisionRequired ? (
           <GameActionForm action={skipRotationSuggestionAction} gameId={game.id}>
-            <Button type="submit" size="sm" variant="outline" className="gap-1">
+            <PendingSubmitButton size="sm" variant="outline" className="gap-1" pendingLabel="Skipping...">
               <SkipForward className="h-3.5 w-3.5" />
               Skip {settings.rotationSkipCooldownDays}d
-            </Button>
+            </PendingSubmitButton>
           </GameActionForm>
         ) : null}
         <GameActionForm action={parkGameForLaterAction} gameId={game.id}>
-          <Button type="submit" size="sm" variant="outline" className="gap-1">
+          <PendingSubmitButton size="sm" variant="outline" className="gap-1" pendingLabel="Parking...">
             <ParkingCircle className="h-3.5 w-3.5" />
             Park
-          </Button>
+          </PendingSubmitButton>
         </GameActionForm>
         <GameActionForm action={markGameWontCompleteFromSuggestionAction} gameId={game.id}>
-          <Button type="submit" size="sm" variant="ghost" className="gap-1">
+          <PendingSubmitButton size="sm" variant="ghost" className="gap-1" pendingLabel="Marking...">
             <CircleSlash className="h-3.5 w-3.5" />
             Won&apos;t
-          </Button>
+          </PendingSubmitButton>
         </GameActionForm>
       </div>
     </div>
