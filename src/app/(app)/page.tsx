@@ -8,17 +8,25 @@ import { DashboardOverviewStrip } from "@/components/dashboard/dashboard-overvie
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
 import { DashboardQueueRow } from "@/components/dashboard/dashboard-queue-row";
 import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { requireUser } from "@/lib/auth";
 import { getDashboardSummary } from "@/lib/backlog/dashboard";
+import { formatMinutes } from "@/lib/backlog/format";
+import { getRotationFillCandidates } from "@/lib/backlog/rotation-fill";
 import type { GameSummary } from "@/lib/backlog/types";
 import { getGames, getSettings } from "@/lib/db/repository";
+import { addRotationSuggestionToRotationAction } from "@/server/actions/game-actions";
 
 export default async function DashboardPage() {
   const user = await requireUser();
   const [settings, games] = await Promise.all([getSettings(user), getGames(user)]);
   const summary = getDashboardSummary(games, settings);
+  const rotationPickCandidates = getRotationFillCandidates(games, settings, {
+    limit: summary.active.openSlots,
+  });
+  const queuePositions = new Map(summary.queuedGames.map((game, index) => [game.id, index + 1]));
 
   return (
     <div className="grid gap-3 p-3 lg:p-4 xl:p-5">
@@ -47,9 +55,17 @@ export default async function DashboardPage() {
           {summary.activeGames.map((game, index) => (
             <DashboardGameCard key={game.id} game={game} priorityImage={index < 5} variant="active" />
           ))}
-          {Array.from({ length: summary.active.openSlots }, (_, index) => (
-            <OpenSlotCard key={`open-slot-${index}`} slotNumber={summary.counts.active + index + 1} />
-          ))}
+          {Array.from({ length: summary.active.openSlots }, (_, index) => {
+            const candidate = rotationPickCandidates[index];
+            return (
+              <OpenSlotCard
+                key={`open-slot-${index}`}
+                slotNumber={summary.counts.active + index + 1}
+                candidate={candidate}
+                queuePosition={candidate ? queuePositions.get(candidate.id) : undefined}
+              />
+            );
+          })}
         </DashboardSection>
         <DashboardActiveHealth summary={summary} settings={settings} />
       </section>
@@ -96,17 +112,58 @@ function DashboardSection({
   );
 }
 
-function OpenSlotCard({ slotNumber }: { slotNumber: number }) {
+function OpenSlotCard({
+  slotNumber,
+  candidate,
+  queuePosition,
+}: {
+  slotNumber: number;
+  candidate?: GameSummary;
+  queuePosition?: number;
+}) {
   return (
     <Card size="sm" className="min-h-40 gap-2 rounded-lg border-dashed bg-muted/20 py-2">
-      <CardContent className="flex h-full min-h-40 flex-col items-center justify-center gap-2 text-center">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background">
-          <Plus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-        </div>
-        <div>
-          <div className="text-sm font-medium">Open slot {slotNumber}</div>
-          <div className="mt-1 text-xs text-muted-foreground">Ready for the next rotation pick</div>
-        </div>
+      <CardContent className="flex h-full min-h-40 flex-col justify-center gap-3">
+        {candidate ? (
+          <>
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 text-center sm:justify-start sm:text-left">
+                <Badge variant="secondary" className="font-mono">
+                  #{queuePosition ?? "?"}
+                </Badge>
+                <span className="text-xs text-muted-foreground">Slot {slotNumber} pick</span>
+              </div>
+              <Link
+                href={`/games/${candidate.id}`}
+                className="mt-2 block min-w-0 text-center text-sm font-medium underline-offset-4 hover:underline sm:text-left"
+              >
+                <span className="line-clamp-2">{candidate.title}</span>
+              </Link>
+              <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground sm:justify-start">
+                <span>Score {candidate.priorityScore}</span>
+                <span>Playtime {formatMinutes(candidate.playtimeMinutes)}</span>
+                {candidate.estimatedHours != null ? <span>Est {candidate.estimatedHours}h</span> : null}
+              </div>
+            </div>
+            <form action={addRotationSuggestionToRotationAction}>
+              <input type="hidden" name="gameId" value={candidate.id} />
+              <Button type="submit" size="sm" className="w-full justify-center gap-1">
+                <Plus className="h-3.5 w-3.5" />
+                Add to rotation
+              </Button>
+            </form>
+          </>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-2 text-center">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background">
+              <Plus className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+            </div>
+            <div>
+              <div className="text-sm font-medium">Open slot {slotNumber}</div>
+              <div className="mt-1 text-xs text-muted-foreground">No immediate queue pick available</div>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
