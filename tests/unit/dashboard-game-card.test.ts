@@ -83,6 +83,10 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Score 58");
     expect(html).toContain("Open");
     expect(html).toContain("Steam");
+    expect(html).toContain("Install");
+    expect(html).toContain("Launch");
+    expect(html).toContain('href="steam://install/227580"');
+    expect(html).toContain('href="steam://run/227580"');
     expect(html).not.toContain("<details");
     expect(html).not.toContain("Details");
   });

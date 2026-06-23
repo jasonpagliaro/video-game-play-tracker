@@ -11,6 +11,16 @@ export function getSteamStoreUrl(steamAppId: number | null | undefined) {
   return `https://store.steampowered.com/app/${steamAppId}/`;
 }
 
+export function getSteamInstallUrl(steamAppId: number | null | undefined) {
+  if (!isValidSteamAppId(steamAppId)) return null;
+  return `steam://install/${steamAppId}`;
+}
+
+export function getSteamLaunchUrl(steamAppId: number | null | undefined) {
+  if (!isValidSteamAppId(steamAppId)) return null;
+  return `steam://run/${steamAppId}`;
+}
+
 export function getSteamIdentityLabel(steamAppId: number | null | undefined) {
   return isValidSteamAppId(steamAppId) ? `Steam App ${steamAppId}` : "Manual / unmatched";
 }

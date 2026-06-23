@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown, ExternalLink } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Download, ExternalLink, Play } from "lucide-react";
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
 import { GameIdentityBanner } from "@/components/dashboard/game-identity-banner";
@@ -8,7 +8,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate, formatMinutes, formatPercent } from "@/lib/backlog/format";
 import type { GameSummary } from "@/lib/backlog/types";
-import { getSteamIdentityLabel, getSteamStoreUrl } from "@/lib/steam/assets";
+import { getSteamIdentityLabel, getSteamInstallUrl, getSteamLaunchUrl, getSteamStoreUrl } from "@/lib/steam/assets";
 import { cn } from "@/lib/utils";
 
 export function DashboardGameCard({
@@ -23,6 +23,8 @@ export function DashboardGameCard({
   variant?: "default" | "compact" | "active";
 }) {
   const steamStoreUrl = getSteamStoreUrl(game.steamAppId);
+  const steamInstallUrl = getSteamInstallUrl(game.steamAppId);
+  const steamLaunchUrl = getSteamLaunchUrl(game.steamAppId);
 
   if (variant === "active") {
     return (
@@ -75,6 +77,22 @@ export function DashboardGameCard({
               ) : null}
             </div>
           </div>
+          {steamInstallUrl && steamLaunchUrl ? (
+            <div className="grid grid-cols-2 gap-1.5">
+              <Button asChild size="sm" variant="outline" className="min-w-0 px-2 text-xs">
+                <a href={steamInstallUrl} aria-label={`Install ${game.title} in Steam`}>
+                  <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="truncate">Install</span>
+                </a>
+              </Button>
+              <Button asChild size="sm" variant="outline" className="min-w-0 px-2 text-xs">
+                <a href={steamLaunchUrl} aria-label={`Launch ${game.title} in Steam`}>
+                  <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="truncate">Launch</span>
+                </a>
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     );
