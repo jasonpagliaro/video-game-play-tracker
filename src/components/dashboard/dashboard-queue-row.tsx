@@ -2,9 +2,9 @@ import Link from "next/link";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
+import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatMinutes } from "@/lib/backlog/format";
 import type { GameSummary } from "@/lib/backlog/types";
 import { getSteamStoreUrl } from "@/lib/steam/assets";
 
@@ -35,10 +35,8 @@ export function DashboardQueueRow({
         </div>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
           <span>Score {game.priorityScore}</span>
-          <span>Playtime {formatMinutes(game.playtimeMinutes)}</span>
-          <span>Est {game.estimatedHours ? `${game.estimatedHours}h` : "-"}</span>
-          <span>Last {formatDate(game.lastPlayed)}</span>
         </div>
+        <DashboardPlaytimeDetails game={game} className="mt-2" metricsClassName="sm:grid-cols-5" />
       </div>
       <div className="flex flex-wrap gap-2 md:justify-end">
         <Button asChild size="sm" variant="outline">

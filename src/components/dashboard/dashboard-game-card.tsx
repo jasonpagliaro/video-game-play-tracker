@@ -3,10 +3,10 @@ import { ArrowUpRight, ChevronDown, Download, ExternalLink, Play } from "lucide-
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
 import { GameIdentityBanner } from "@/components/dashboard/game-identity-banner";
+import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDate, formatMinutes, formatPercent } from "@/lib/backlog/format";
 import type { GameSummary } from "@/lib/backlog/types";
 import { getSteamIdentityLabel, getSteamInstallUrl, getSteamLaunchUrl, getSteamStoreUrl } from "@/lib/steam/assets";
 import { cn } from "@/lib/utils";
@@ -50,13 +50,6 @@ export function DashboardGameCard({
             <DashboardBadgeStrip game={game} layout="active" />
           </div>
 
-          <div data-dashboard-metrics="active" className="grid grid-cols-4 gap-1.5 rounded-md bg-muted/60 p-2 text-[11px]">
-            <Metric label="Played" value={formatMinutes(game.playtimeMinutes)} />
-            <Metric label="Ach" value={formatPercent(game.achievementPercent)} />
-            <Metric label="Est" value={game.estimatedHours ? `${game.estimatedHours}h` : "-"} />
-            <Metric label="Last" value={formatDate(game.lastPlayed)} />
-          </div>
-
           <div className="grid gap-1 text-xs text-muted-foreground">
             <div className="flex items-center justify-between gap-2">
               <span className="truncate font-mono">{getSteamIdentityLabel(game.steamAppId)}</span>
@@ -73,6 +66,7 @@ export function DashboardGameCard({
               ) : null}
             </div>
           </div>
+          <DashboardPlaytimeDetails game={game} metricsClassName="text-[11px]" />
           {steamInstallUrl && steamLaunchUrl ? (
             <div data-dashboard-actions="active" className="grid grid-cols-2 gap-1.5">
               <Button asChild size="sm" variant="outline" className="min-w-0 px-2 text-xs">
@@ -153,11 +147,7 @@ export function DashboardGameCard({
           </summary>
 
           <div className="grid gap-3">
-            <div className="grid grid-cols-3 gap-2 rounded-md bg-muted/60 p-2 text-xs">
-              <Metric label="Playtime" value={formatMinutes(game.playtimeMinutes)} />
-              <Metric label="Ach" value={formatPercent(game.achievementPercent)} />
-              <Metric label="Last" value={formatDate(game.lastPlayed)} />
-            </div>
+            <DashboardPlaytimeDetails game={game} />
 
             <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span className="truncate font-mono">{getSteamIdentityLabel(game.steamAppId)}</span>
@@ -184,15 +174,6 @@ export function DashboardGameCard({
         </details>
       </CardContent>
     </Card>
-  );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="min-w-0">
-      <div className="truncate text-muted-foreground">{label}</div>
-      <div className="truncate font-mono text-foreground">{value}</div>
-    </div>
   );
 }
 

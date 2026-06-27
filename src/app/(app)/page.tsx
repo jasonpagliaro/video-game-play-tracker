@@ -7,6 +7,7 @@ import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
 import { DashboardOverviewStrip } from "@/components/dashboard/dashboard-overview-strip";
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
 import { DashboardQueueRow } from "@/components/dashboard/dashboard-queue-row";
+import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
 import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { requireUser } from "@/lib/auth";
 import { getDashboardSummary } from "@/lib/backlog/dashboard";
-import { formatMinutes } from "@/lib/backlog/format";
 import { getRotationFillCandidates } from "@/lib/backlog/rotation-fill";
 import type { GameSummary } from "@/lib/backlog/types";
 import { getGames, getSettings } from "@/lib/db/repository";
@@ -142,9 +142,8 @@ function OpenSlotCard({
               </Link>
               <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground sm:justify-start">
                 <span>Score {candidate.priorityScore}</span>
-                <span>Playtime {formatMinutes(candidate.playtimeMinutes)}</span>
-                {candidate.estimatedHours != null ? <span>Est {candidate.estimatedHours}h</span> : null}
               </div>
+              <DashboardPlaytimeDetails game={candidate} className="mt-2" />
             </div>
             <form action={addRotationSuggestionToRotationAction}>
               <input type="hidden" name="gameId" value={candidate.id} />
