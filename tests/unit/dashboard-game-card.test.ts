@@ -56,6 +56,7 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Typical");
     expect(html).toContain("Remaining");
     expect(html).toContain("Progress");
+    expect(html).toContain("Basis");
     expect(html).toContain("Steam App 227580");
     expect(html).toContain("Score 58");
   });
@@ -118,6 +119,7 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Remaining");
     expect(html).toContain("Progress");
     expect(html).toContain("Last played");
+    expect(html).toContain("Saved estimate");
     expect(html).toContain("Steam App 227580");
     expect(html).toContain("Score 58");
     expect(html).toContain("Open");

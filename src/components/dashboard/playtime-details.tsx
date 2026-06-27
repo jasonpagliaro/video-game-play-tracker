@@ -10,7 +10,7 @@ export function DashboardPlaytimeDetails({
   className,
   metricsClassName,
 }: {
-  game: Pick<GameSummary, "playtimeMinutes" | "estimatedHours" | "lastPlayed">;
+  game: Pick<GameSummary, "playtimeMinutes" | "estimatedHours" | "lastPlayed" | "backlogSlot" | "completionType">;
   className?: string;
   metricsClassName?: string;
 }) {
@@ -40,6 +40,7 @@ export function DashboardPlaytimeDetails({
         <Metric label="Remaining" value={metrics.remaining} />
         <Metric label="Progress" value={metrics.progress} />
         <Metric label="Last played" value={metrics.lastPlayed} />
+        <Metric label="Basis" value={metrics.basis} />
       </div>
     </details>
   );

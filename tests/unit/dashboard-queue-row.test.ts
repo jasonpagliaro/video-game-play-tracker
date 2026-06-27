@@ -63,6 +63,7 @@ describe("DashboardQueueRow", () => {
     expect(html).toContain("Remaining");
     expect(html).toContain("Progress");
     expect(html).toContain("Last played");
+    expect(html).toContain("Saved estimate");
     expect(html).toContain("Open");
     expect(html).toContain("Steam");
     expect(html).not.toContain("Steam header artwork");
