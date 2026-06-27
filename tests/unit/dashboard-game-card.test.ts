@@ -39,24 +39,20 @@ const game: GameSummary = {
 };
 
 describe("DashboardGameCard", () => {
-  it("keeps playtime metrics and lower metadata inside closed details menus", () => {
+  it("renders a closed playtime control in the lower details menu", () => {
     const html = renderToStaticMarkup(createElement(DashboardGameCard, { game }));
 
     const detailsIndex = html.indexOf("<details");
-    const summaryIndex = html.indexOf("<summary", detailsIndex);
-    const playtimeIndex = html.indexOf("Play time", summaryIndex);
-    const playedIndex = html.indexOf("Played", playtimeIndex);
+    const playtimeIndex = html.indexOf('data-dashboard-playtime-details="playtime"', detailsIndex);
+    const buttonIndex = html.indexOf("<button", playtimeIndex);
 
     expect(detailsIndex).toBeGreaterThan(-1);
-    expect(summaryIndex).toBeGreaterThan(detailsIndex);
-    expect(playtimeIndex).toBeGreaterThan(summaryIndex);
-    expect(playedIndex).toBeGreaterThan(playtimeIndex);
-    expect(html.slice(detailsIndex, summaryIndex)).not.toContain("open");
+    expect(playtimeIndex).toBeGreaterThan(detailsIndex);
+    expect(buttonIndex).toBeGreaterThan(playtimeIndex);
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Show play time details");
+    expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).toContain("Details");
-    expect(html).toContain("Typical");
-    expect(html).toContain("Remaining");
-    expect(html).toContain("Progress");
-    expect(html).toContain("Basis");
     expect(html).toContain("Steam App 227580");
     expect(html).toContain("Score 58");
   });
@@ -88,9 +84,7 @@ describe("DashboardGameCard", () => {
     const completionIndex = html.indexOf("Needs Type", badgeStripIndex);
     const slotIndex = html.indexOf("Short / Palate Cleanser", badgeStripIndex);
     const detailsIndex = html.indexOf('data-dashboard-playtime-details="playtime"');
-    const summaryIndex = html.indexOf("<summary", detailsIndex);
-    const playedIndex = html.indexOf("Played", summaryIndex);
-    const playedValueIndex = html.indexOf("10m", playedIndex);
+    const buttonIndex = html.indexOf("<button", detailsIndex);
 
     expect(html).toContain('data-dashboard-card-variant="active"');
     expect(html).toContain("aspect-[92/43]");
@@ -109,17 +103,12 @@ describe("DashboardGameCard", () => {
     expect(html).toContain('data-dashboard-actions="active"');
     expect(html).toContain("10,000,000");
     expect(detailsIndex).toBeGreaterThan(-1);
-    expect(summaryIndex).toBeGreaterThan(detailsIndex);
-    expect(html.slice(detailsIndex, summaryIndex)).not.toContain("open");
+    expect(buttonIndex).toBeGreaterThan(detailsIndex);
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Show play time details");
     expect(html).toContain("Play time");
-    expect(html).toContain("Played");
-    expect(playedIndex).toBeGreaterThan(summaryIndex);
-    expect(playedValueIndex).toBeGreaterThan(playedIndex);
-    expect(html).toContain("Typical");
-    expect(html).toContain("Remaining");
-    expect(html).toContain("Progress");
-    expect(html).toContain("Last played");
-    expect(html).toContain("Saved estimate");
+    expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
+    expect(html).not.toContain("Saved estimate");
     expect(html).toContain("Steam App 227580");
     expect(html).toContain("Score 58");
     expect(html).toContain("Open");
@@ -128,6 +117,6 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Launch");
     expect(html).toContain('href="steam://install/227580"');
     expect(html).toContain('href="steam://run/227580"');
-    expect(html).toContain("<details");
+    expect(html).toContain("<button");
   });
 });

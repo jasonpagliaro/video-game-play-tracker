@@ -42,8 +42,7 @@ describe("DashboardQueueRow", () => {
   it("renders queue games with playtime metrics behind a disclosure and no artwork", () => {
     const html = renderToStaticMarkup(createElement(DashboardQueueRow, { game, position: 2 }));
     const detailsIndex = html.indexOf('data-dashboard-playtime-details="playtime"');
-    const summaryIndex = html.indexOf("<summary", detailsIndex);
-    const playedIndex = html.indexOf("Played", summaryIndex);
+    const buttonIndex = html.indexOf("<button", detailsIndex);
 
     expect(html).toContain("#2");
     expect(html).toContain("A Short Hike");
@@ -53,17 +52,12 @@ describe("DashboardQueueRow", () => {
     expect(html).not.toContain("Playtime 45m");
     expect(html).not.toContain("Est 2h");
     expect(detailsIndex).toBeGreaterThan(-1);
-    expect(summaryIndex).toBeGreaterThan(detailsIndex);
-    expect(html.slice(detailsIndex, summaryIndex)).not.toContain("open");
+    expect(buttonIndex).toBeGreaterThan(detailsIndex);
+    expect(html).toContain('aria-expanded="false"');
+    expect(html).toContain("Show play time details");
     expect(html).toContain("Play time");
-    expect(playedIndex).toBeGreaterThan(summaryIndex);
-    expect(html.indexOf("45m", playedIndex)).toBeGreaterThan(playedIndex);
-    expect(html).toContain("Typical");
-    expect(html).toContain("2h");
-    expect(html).toContain("Remaining");
-    expect(html).toContain("Progress");
-    expect(html).toContain("Last played");
-    expect(html).toContain("Saved estimate");
+    expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
+    expect(html).not.toContain("Saved estimate");
     expect(html).toContain("Open");
     expect(html).toContain("Steam");
     expect(html).not.toContain("Steam header artwork");

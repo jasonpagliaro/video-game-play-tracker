@@ -7,7 +7,7 @@ import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
 import { DashboardOverviewStrip } from "@/components/dashboard/dashboard-overview-strip";
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
 import { DashboardQueueRow } from "@/components/dashboard/dashboard-queue-row";
-import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
+import { DashboardPlaytimeDetails, DashboardPlaytimeDetailsProvider } from "@/components/dashboard/playtime-details";
 import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,7 @@ export default async function DashboardPage() {
   const queuePositions = new Map(summary.queuedGames.map((game, index) => [game.id, index + 1]));
 
   return (
+    <DashboardPlaytimeDetailsProvider>
     <div className="grid gap-3 p-3 lg:p-4 xl:p-5">
       <section className="grid min-h-[calc(100svh-1.5rem)] content-start gap-3 lg:min-h-[calc(100svh-2rem)] xl:min-h-[calc(100svh-2.5rem)]">
         <header className="flex items-center justify-between gap-3">
@@ -76,6 +77,7 @@ export default async function DashboardPage() {
         <DashboardQueueRowsSection games={summary.nextWindowGames} />
       </section>
     </div>
+    </DashboardPlaytimeDetailsProvider>
   );
 }
 
