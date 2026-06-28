@@ -159,7 +159,7 @@ export function insertGamesWithCategoryBalance(
 }
 
 export function rebalanceQueue(queue: QueueCandidate[], options?: { windowSize?: number }) {
-  return insertGamesWithCategoryBalance([], queue, options);
+  return insertGamesWithCategoryBalance(queue, [], options);
 }
 
 export function isQueueEligible(candidate: QueueCandidate) {

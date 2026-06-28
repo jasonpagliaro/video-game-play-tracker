@@ -6,6 +6,7 @@ import {
   findQueueSlotCluster,
   insertGamesWithCategoryBalance,
   rankQueueSequentially,
+  rebalanceQueue,
   reorderQueueByCommand,
   sortQueueByPreset,
 } from "@/lib/backlog/queue";
@@ -189,6 +190,21 @@ describe("queue balancing", () => {
       ["locked", 2000],
       ["a", 3000],
     ]);
+  });
+
+  it("preserves locked positions during app recommendation rebalance", () => {
+    const queue = [
+      game("low-a", "action", 10, { queueRank: 1000 }),
+      game("low-b", "puzzle", 10, { queueRank: 2000 }),
+      game("locked", "horror", 100, { queueLocked: true, queueRank: 3000 }),
+      game("low-c", "short", 10, { queueRank: 4000 }),
+    ];
+
+    const ranked = rebalanceQueue(queue).queue;
+    const ranks = ranked.map((item) => item.queueRank);
+
+    expect(ranked.find((item) => item.id === "locked")?.queueRank).toBe(3000);
+    expect(new Set(ranks).size).toBe(ranks.length);
   });
 
   it("keeps locked items fixed while sorting movable queue items", () => {
