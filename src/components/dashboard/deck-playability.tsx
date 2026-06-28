@@ -47,7 +47,9 @@ export function DeckPlayabilityBadge({ game }: { game: DeckPlayabilityGame }) {
   const officialCategory = category && category !== "unknown" ? category : null;
   const label = officialCategory
     ? `Deck ${getSteamDeckCompatibilityCategoryLabel(officialCategory)}`
-    : `Deck ${getProtonDbTierLabel(game.protondbTier)}`;
+    : game.protondbTier
+      ? `ProtonDB ${getProtonDbTierLabel(game.protondbTier)}`
+      : "ProtonDB";
 
   return (
     <Badge
@@ -59,6 +61,19 @@ export function DeckPlayabilityBadge({ game }: { game: DeckPlayabilityGame }) {
     >
       <span className="truncate">{label}</span>
     </Badge>
+  );
+}
+
+export function DeckPlayabilitySummary({ game, className }: { game: DeckPlayabilityGame; className?: string }) {
+  if (!hasDeckPlayabilityData(game)) return null;
+
+  const parts = [getOfficialSteamDeckSummary(game), getProtonDbSummary(game)].filter(Boolean);
+  if (!parts.length) return null;
+
+  return (
+    <div data-dashboard-deck-summary="playability" className={cn("min-w-0 text-xs text-muted-foreground", className)}>
+      <span className="line-clamp-2">{parts.join(" · ")}</span>
+    </div>
   );
 }
 
@@ -141,6 +156,26 @@ function Metric({ label, value }: { label: string; value: string }) {
       <div className="truncate font-mono text-foreground">{value}</div>
     </div>
   );
+}
+
+function getOfficialSteamDeckSummary(game: DeckPlayabilityGame) {
+  const category = game.steamDeckCompatibilityCategory;
+  if (!category || category === "unknown") return null;
+  return `Steam ${getSteamDeckCompatibilityCategoryLabel(category)}`;
+}
+
+function getProtonDbSummary(game: DeckPlayabilityGame) {
+  if (!game.protondbTier && game.protondbScore == null && game.protondbReportCount == null) return null;
+
+  const parts = [game.protondbTier ? `ProtonDB ${getProtonDbTierLabel(game.protondbTier)}` : "ProtonDB"];
+  const score = formatProtonDbScore(game.protondbScore);
+  if (score !== "-") parts.push(score);
+  if (game.protondbReportCount != null) parts.push(formatReportCount(game.protondbReportCount));
+  return parts.join(" · ");
+}
+
+function formatReportCount(count: number) {
+  return `${count.toLocaleString("en-US")} ${count === 1 ? "report" : "reports"}`;
 }
 
 function criterionClassName(status: string) {

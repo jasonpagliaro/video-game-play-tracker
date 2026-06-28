@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { CircleSlash, ParkingCircle, Plus, RotateCw, SkipForward, TriangleAlert } from "lucide-react";
 
+import { DeckPlayabilityBadge, DeckPlayabilitySummary } from "@/components/dashboard/deck-playability";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
@@ -101,6 +102,7 @@ function RotationSuggestionRow({
               Decision due
             </Badge>
           ) : null}
+          <DeckPlayabilityBadge game={game} />
           <Link href={`/games/${game.id}`} className="min-w-0 font-medium underline-offset-4 hover:underline">
             <span className="line-clamp-1">{game.title}</span>
           </Link>
@@ -109,8 +111,8 @@ function RotationSuggestionRow({
           <span>Skipped {game.rotationSkipCount}/{settings.rotationSkipLimit}</span>
           <span>Playtime {formatMinutes(game.playtimeMinutes)}</span>
           <span>Last {formatDate(game.lastPlayed)}</span>
-          <span>Queue priority {game.priorityScore}</span>
         </div>
+        <DeckPlayabilitySummary game={game} className="mt-1" />
       </div>
       <div className="flex flex-wrap gap-2 lg:justify-end">
         <GameActionForm action={addRotationSuggestionToRotationAction} gameId={game.id}>

@@ -3,7 +3,11 @@ import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
 
 import { DashboardActiveHealth } from "@/components/dashboard/dashboard-active-health";
-import { DashboardDeckPlayabilityDetailsProvider } from "@/components/dashboard/deck-playability";
+import {
+  DashboardDeckPlayabilityDetailsProvider,
+  DeckPlayabilityBadge,
+  DeckPlayabilitySummary,
+} from "@/components/dashboard/deck-playability";
 import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
 import { DashboardOverviewStrip } from "@/components/dashboard/dashboard-overview-strip";
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
@@ -138,6 +142,7 @@ function OpenSlotCard({
                   #{queuePosition ?? "?"}
                 </Badge>
                 <span className="text-xs text-muted-foreground">Slot {slotNumber} pick</span>
+                <DeckPlayabilityBadge game={candidate} />
               </div>
               <Link
                 href={`/games/${candidate.id}`}
@@ -145,9 +150,7 @@ function OpenSlotCard({
               >
                 <span className="line-clamp-2">{candidate.title}</span>
               </Link>
-              <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground sm:justify-start">
-                <span>Queue priority {candidate.priorityScore}</span>
-              </div>
+              <DeckPlayabilitySummary game={candidate} className="mt-2 text-center sm:text-left" />
               <DashboardPlaytimeDetails game={candidate} className="mt-2" />
             </div>
             <form action={addRotationSuggestionToRotationAction}>

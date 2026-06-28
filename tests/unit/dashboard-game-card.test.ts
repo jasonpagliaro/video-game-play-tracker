@@ -62,7 +62,7 @@ describe("DashboardGameCard", () => {
     expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).toContain("Details");
     expect(html).not.toContain("Steam App 227580");
-    expect(html).toContain("Queue priority 58");
+    expect(html).not.toContain("Queue priority 58");
   });
 
   it("renders active-rotation compact cards without the details disclosure", () => {
@@ -119,7 +119,7 @@ describe("DashboardGameCard", () => {
     expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).not.toContain("Saved estimate");
     expect(html).not.toContain("Steam App 227580");
-    expect(html).toContain("Queue priority 58");
+    expect(html).not.toContain("Queue priority 58");
     expect(html).toContain("Open");
     expect(html).toContain("Steam");
     expect(html).toContain("Install");
@@ -152,8 +152,13 @@ describe("DashboardGameCard", () => {
     const html = renderToStaticMarkup(createElement(DashboardGameCard, { game: deckGame }));
 
     expect(html).toContain('data-dashboard-deck-badge="playability"');
+    expect(html).toContain('data-dashboard-deck-summary="playability"');
     expect(html).toContain("Deck Verified");
     expect(html.indexOf("Deck Verified")).toBeLessThan(html.indexOf("Short / Palate Cleanser"));
+    expect(html).toContain("Steam Verified");
+    expect(html).toContain("ProtonDB Platinum");
+    expect(html).toContain("91%");
+    expect(html).toContain("42 reports");
     expect(html).toContain('data-dashboard-deck-details="playability"');
     expect(html).toContain("Show Steam Deck details");
     expect(html).toContain("Deck experience");
@@ -175,7 +180,9 @@ describe("DashboardGameCard", () => {
       }),
     );
 
-    expect(html).toContain("Deck Gold");
+    expect(html).toContain("ProtonDB Gold");
+    expect(html).toContain("78%");
+    expect(html).toContain("20 reports");
     expect(html).toContain("Deck experience");
     expect(html).not.toContain('data-dashboard-deck-metrics="playability"');
   });

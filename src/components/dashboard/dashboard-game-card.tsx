@@ -2,7 +2,11 @@ import Link from "next/link";
 import { ArrowUpRight, ChevronDown, Download, ExternalLink, Play } from "lucide-react";
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
-import { DashboardDeckPlayabilityDetails, DeckPlayabilityBadge } from "@/components/dashboard/deck-playability";
+import {
+  DashboardDeckPlayabilityDetails,
+  DeckPlayabilityBadge,
+  DeckPlayabilitySummary,
+} from "@/components/dashboard/deck-playability";
 import { GameIdentityBanner } from "@/components/dashboard/game-identity-banner";
 import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
 import { Badge } from "@/components/ui/badge";
@@ -49,12 +53,10 @@ export function DashboardGameCard({
               ) : null}
             </div>
             <DashboardBadgeStrip game={game} layout="active" />
+            <DeckPlayabilitySummary game={game} className="text-[11px]" />
           </div>
 
           <div className="grid gap-1 text-xs text-muted-foreground">
-            <div className="flex items-center justify-end gap-2">
-              <span className="shrink-0">Queue priority {game.priorityScore}</span>
-            </div>
             <div className="flex items-center gap-3">
               <Link href={`/games/${game.id}`} className="font-medium text-foreground underline-offset-4 hover:underline">
                 Open
@@ -110,6 +112,7 @@ export function DashboardGameCard({
             ) : null}
           </div>
           <DashboardBadgeStrip game={game} />
+          <DeckPlayabilitySummary game={game} />
         </CardContent>
       </Card>
     );
@@ -131,6 +134,7 @@ export function DashboardGameCard({
             ) : null}
           </div>
           <DashboardBadgeStrip game={game} />
+          <DeckPlayabilitySummary game={game} />
         </div>
 
         <details className="group/details grid gap-3">
@@ -150,10 +154,6 @@ export function DashboardGameCard({
           <div className="grid gap-3">
             <DashboardPlaytimeDetails game={game} />
             <DashboardDeckPlayabilityDetails game={game} />
-
-            <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-              <span className="shrink-0">Queue priority {game.priorityScore}</span>
-            </div>
 
             <div className="flex flex-wrap gap-2">
               <Button asChild size="sm" variant="outline">

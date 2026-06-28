@@ -56,7 +56,7 @@ describe("DashboardQueueRow", () => {
     expect(html).toContain("A Short Hike");
     expect(html).toContain("Short / Palate Cleanser");
     expect(html).toContain("Completable");
-    expect(html).toContain("Queue priority 88");
+    expect(html).not.toContain("Queue priority 88");
     expect(html).not.toContain("Playtime 45m");
     expect(html).not.toContain("Est 2h");
     expect(detailsIndex).toBeGreaterThan(-1);
@@ -88,8 +88,12 @@ describe("DashboardQueueRow", () => {
     );
 
     expect(html).toContain('data-dashboard-deck-badge="playability"');
+    expect(html).toContain('data-dashboard-deck-summary="playability"');
     expect(html).toContain("Deck Playable");
-    expect(html).not.toContain("Deck Gold");
+    expect(html).toContain("Steam Playable");
+    expect(html).toContain("ProtonDB Gold");
+    expect(html).toContain("78%");
+    expect(html).toContain("20 reports");
     expect(html).toContain("Deck experience");
     expect(html).not.toContain('data-dashboard-deck-metrics="playability"');
   });
