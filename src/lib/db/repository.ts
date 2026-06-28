@@ -1274,24 +1274,56 @@ async function persistQueueRanks(
   queue: QueueCandidate[],
   existingRanks?: Map<string, number | null>,
 ) {
-  const movable = queue.filter((item) => !item.queueLocked && item.queueRank != null);
+  const rankedQueue = queue.filter((item) => item.queueRank != null);
+  const rankCounts = new Map<number, number>();
+  for (const item of rankedQueue) {
+    const rank = item.queueRank;
+    if (rank == null) continue;
+    rankCounts.set(rank, (rankCounts.get(rank) ?? 0) + 1);
+  }
+  if ([...rankCounts.values()].some((count) => count > 1)) {
+    throw new Error("Queue rebalance produced duplicate ranks.");
+  }
+
+  const movable = rankedQueue.filter((item) => !item.queueLocked);
   const ranksToPersist = existingRanks
     ? movable.filter((item) => existingRanks.get(item.id) !== item.queueRank)
     : movable;
   if (ranksToPersist.length === 0) return;
 
   const now = new Date();
-  for (let index = 0; index < ranksToPersist.length; index += 1) {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${"video_game_play_tracker_queue_" + userId})::bigint)`);
+
+  const currentQueueRows = await tx
+    .select({ id: games.id, queueRank: games.queueRank })
+    .from(games)
+    .where(and(eq(games.userId, userId), sql`${games.queueRank} is not null`))
+    .orderBy(asc(games.queueRank), asc(games.id));
+  const finalIds = new Set(rankedQueue.map((item) => item.id));
+  const finalRanks = new Set(rankedQueue.map((item) => item.queueRank));
+  const rowsToRestore = currentQueueRows.filter((row) => !finalIds.has(row.id));
+  const overlappingMissingRows = rowsToRestore.filter((row) => row.queueRank != null && finalRanks.has(row.queueRank));
+  if (overlappingMissingRows.length > 0) {
+    throw new Error("Queue rebalance did not include every game needed to rewrite ranks.");
+  }
+
+  for (let index = 0; index < currentQueueRows.length; index += 1) {
     await tx
       .update(games)
       .set({ queueRank: -(index + 1) * 1000000, updatedAt: now })
-      .where(and(eq(games.userId, userId), eq(games.id, ranksToPersist[index].id)));
+      .where(and(eq(games.userId, userId), eq(games.id, currentQueueRows[index].id)));
   }
-  for (const item of ranksToPersist) {
+  for (const item of rankedQueue) {
     await tx
       .update(games)
       .set({ queueRank: item.queueRank, updatedAt: now })
       .where(and(eq(games.userId, userId), eq(games.id, item.id)));
+  }
+  for (const row of rowsToRestore) {
+    await tx
+      .update(games)
+      .set({ queueRank: row.queueRank, updatedAt: now })
+      .where(and(eq(games.userId, userId), eq(games.id, row.id)));
   }
 }
 
