@@ -47,10 +47,8 @@ const game: GameSummary = {
 };
 
 describe("DashboardQueueRow", () => {
-  it("renders queue games with playtime metrics behind a disclosure and no artwork", () => {
+  it("renders queue games with visible playtime summary and no artwork", () => {
     const html = renderToStaticMarkup(createElement(DashboardQueueRow, { game, position: 2 }));
-    const detailsIndex = html.indexOf('data-dashboard-playtime-details="playtime"');
-    const buttonIndex = html.indexOf("<button", detailsIndex);
 
     expect(html).toContain("#2");
     expect(html).toContain("A Short Hike");
@@ -59,11 +57,16 @@ describe("DashboardQueueRow", () => {
     expect(html).not.toContain("Queue priority 88");
     expect(html).not.toContain("Playtime 45m");
     expect(html).not.toContain("Est 2h");
-    expect(detailsIndex).toBeGreaterThan(-1);
-    expect(buttonIndex).toBeGreaterThan(detailsIndex);
-    expect(html).toContain('aria-expanded="false"');
-    expect(html).toContain("Show play time details");
-    expect(html).toContain("Play time");
+    expect(html).toContain('data-dashboard-playtime-summary="playtime"');
+    expect(html).toContain("Played");
+    expect(html).toContain("45m");
+    expect(html).toContain("Progress");
+    expect(html).toContain("38%");
+    expect(html).toContain("Remaining");
+    expect(html).toContain("1.3h");
+    expect(html).not.toContain('aria-expanded="false"');
+    expect(html).not.toContain("Show play time details");
+    expect(html).not.toContain("Play time");
     expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).not.toContain("Saved estimate");
     expect(html).toContain("Open");
@@ -90,11 +93,12 @@ describe("DashboardQueueRow", () => {
     expect(html).toContain('data-dashboard-deck-badge="playability"');
     expect(html).toContain('data-dashboard-deck-summary="playability"');
     expect(html).toContain("Deck Playable");
+    expect(html).toContain("Good with minor caveats");
     expect(html).toContain("Steam Playable");
     expect(html).toContain("ProtonDB Gold");
     expect(html).toContain("78%");
     expect(html).toContain("20 reports");
-    expect(html).toContain("Deck experience");
+    expect(html).not.toContain("Deck experience");
     expect(html).not.toContain('data-dashboard-deck-metrics="playability"');
   });
 });

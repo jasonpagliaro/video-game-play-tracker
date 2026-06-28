@@ -1,20 +1,15 @@
 import Link from "next/link";
-import { ArrowUpRight, ChevronDown, Download, ExternalLink, Play } from "lucide-react";
+import { ArrowUpRight, Download, ExternalLink, Play } from "lucide-react";
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
-import {
-  DashboardDeckPlayabilityDetails,
-  DeckPlayabilityBadge,
-  DeckPlayabilitySummary,
-} from "@/components/dashboard/deck-playability";
+import { DeckPlayabilityBadge, DeckPlayabilitySummary } from "@/components/dashboard/deck-playability";
 import { GameIdentityBanner } from "@/components/dashboard/game-identity-banner";
-import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
+import { DashboardPlaytimeSummary } from "@/components/dashboard/playtime-details";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { GameSummary } from "@/lib/backlog/types";
 import { getSteamInstallUrl, getSteamLaunchUrl, getSteamStoreUrl } from "@/lib/steam/assets";
-import { cn } from "@/lib/utils";
 
 export function DashboardGameCard({
   game,
@@ -55,6 +50,7 @@ export function DashboardGameCard({
             <DashboardBadgeStrip game={game} layout="active" />
             <DeckPlayabilitySummary game={game} className="text-[11px]" />
           </div>
+          <DashboardPlaytimeSummary game={game} className="text-[11px]" />
 
           <div className="grid gap-1 text-xs text-muted-foreground">
             <div className="flex items-center gap-3">
@@ -68,8 +64,6 @@ export function DashboardGameCard({
               ) : null}
             </div>
           </div>
-          <DashboardPlaytimeDetails game={game} metricsClassName="text-[11px]" />
-          <DashboardDeckPlayabilityDetails game={game} metricsClassName="text-[11px]" />
           {steamInstallUrl && steamLaunchUrl ? (
             <div data-dashboard-actions="active" className="grid grid-cols-2 gap-1.5">
               <Button asChild size="sm" variant="outline" className="min-w-0 px-2 text-xs">
@@ -113,6 +107,7 @@ export function DashboardGameCard({
           </div>
           <DashboardBadgeStrip game={game} />
           <DeckPlayabilitySummary game={game} />
+          <DashboardPlaytimeSummary game={game} />
         </CardContent>
       </Card>
     );
@@ -135,44 +130,25 @@ export function DashboardGameCard({
           </div>
           <DashboardBadgeStrip game={game} />
           <DeckPlayabilitySummary game={game} />
+          <DashboardPlaytimeSummary game={game} />
         </div>
 
-        <details className="group/details grid gap-3">
-          <summary
-            className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
-              "w-full cursor-pointer list-none justify-between px-0 text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden",
-            )}
-          >
-            <span>Details</span>
-            <ChevronDown
-              className="h-3.5 w-3.5 transition-transform group-open/details:rotate-180"
-              aria-hidden="true"
-            />
-          </summary>
-
-          <div className="grid gap-3">
-            <DashboardPlaytimeDetails game={game} />
-            <DashboardDeckPlayabilityDetails game={game} />
-
-            <div className="flex flex-wrap gap-2">
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/games/${game.id}`}>
-                  Open
-                  <ArrowUpRight className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-              {steamStoreUrl ? (
-                <Button asChild size="sm" variant="ghost">
-                  <a href={steamStoreUrl} target="_blank" rel="noreferrer">
-                    Steam
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  </a>
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        </details>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href={`/games/${game.id}`}>
+              Open
+              <ArrowUpRight className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+          {steamStoreUrl ? (
+            <Button asChild size="sm" variant="ghost">
+              <a href={steamStoreUrl} target="_blank" rel="noreferrer">
+                Steam
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </Button>
+          ) : null}
+        </div>
       </CardContent>
     </Card>
   );

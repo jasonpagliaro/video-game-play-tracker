@@ -3,16 +3,12 @@ import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
 
 import { DashboardActiveHealth } from "@/components/dashboard/dashboard-active-health";
-import {
-  DashboardDeckPlayabilityDetailsProvider,
-  DeckPlayabilityBadge,
-  DeckPlayabilitySummary,
-} from "@/components/dashboard/deck-playability";
+import { DeckPlayabilityBadge, DeckPlayabilitySummary } from "@/components/dashboard/deck-playability";
 import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
 import { DashboardOverviewStrip } from "@/components/dashboard/dashboard-overview-strip";
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
 import { DashboardQueueRow } from "@/components/dashboard/dashboard-queue-row";
-import { DashboardPlaytimeDetails, DashboardPlaytimeDetailsProvider } from "@/components/dashboard/playtime-details";
+import { DashboardPlaytimeSummary } from "@/components/dashboard/playtime-details";
 import { RotationFillPanel } from "@/components/rotation/rotation-fill-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,56 +31,52 @@ export default async function DashboardPage() {
   const queuePositions = new Map(summary.queuedGames.map((game, index) => [game.id, index + 1]));
 
   return (
-    <DashboardPlaytimeDetailsProvider>
-      <DashboardDeckPlayabilityDetailsProvider>
-        <div className="grid gap-3 p-3 lg:p-4 xl:p-5">
-          <section className="grid min-h-[calc(100svh-1.5rem)] content-start gap-3 lg:min-h-[calc(100svh-2rem)] xl:min-h-[calc(100svh-2.5rem)]">
-            <header className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <h1 className="truncate text-xl font-semibold tracking-normal">Dashboard</h1>
-                <p className="mt-0.5 hidden max-w-3xl truncate text-xs text-muted-foreground sm:block">
-                  Active execution state, queue health, and backlog pressure at a glance.
-                </p>
-              </div>
-              <Button asChild size="sm">
-                <Link href="/import">
-                  Import / sync
-                  <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            </header>
-            <DashboardOverviewStrip summary={summary} settings={settings} />
-            <DashboardSection
-              title="Current active rotation"
-              href="/rotation"
-              empty="No active games in rotation."
-              cardGridClassName="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
-            >
-              {summary.activeGames.map((game, index) => (
-                <DashboardGameCard key={game.id} game={game} priorityImage={index < 5} variant="active" />
-              ))}
-              {Array.from({ length: summary.active.openSlots }, (_, index) => {
-                const candidate = rotationPickCandidates[index];
-                return (
-                  <OpenSlotCard
-                    key={`open-slot-${index}`}
-                    slotNumber={summary.counts.active + index + 1}
-                    candidate={candidate}
-                    queuePosition={candidate ? queuePositions.get(candidate.id) : undefined}
-                  />
-                );
-              })}
-            </DashboardSection>
-            <DashboardActiveHealth summary={summary} settings={settings} />
-          </section>
-          <section className="grid gap-3 pt-3" aria-label="Upcoming games and queue planning">
-            <DashboardQueueStatus summary={summary} />
-            <RotationFillPanel games={games} settings={settings} />
-            <DashboardQueueRowsSection games={summary.nextWindowGames} />
-          </section>
-        </div>
-      </DashboardDeckPlayabilityDetailsProvider>
-    </DashboardPlaytimeDetailsProvider>
+    <div className="grid gap-3 p-3 lg:p-4 xl:p-5">
+      <section className="grid min-h-[calc(100svh-1.5rem)] content-start gap-3 lg:min-h-[calc(100svh-2rem)] xl:min-h-[calc(100svh-2.5rem)]">
+        <header className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="truncate text-xl font-semibold tracking-normal">Dashboard</h1>
+            <p className="mt-0.5 hidden max-w-3xl truncate text-xs text-muted-foreground sm:block">
+              Active execution state, queue health, and backlog pressure at a glance.
+            </p>
+          </div>
+          <Button asChild size="sm">
+            <Link href="/import">
+              Import / sync
+              <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        </header>
+        <DashboardOverviewStrip summary={summary} settings={settings} />
+        <DashboardSection
+          title="Current active rotation"
+          href="/rotation"
+          empty="No active games in rotation."
+          cardGridClassName="sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        >
+          {summary.activeGames.map((game, index) => (
+            <DashboardGameCard key={game.id} game={game} priorityImage={index < 5} variant="active" />
+          ))}
+          {Array.from({ length: summary.active.openSlots }, (_, index) => {
+            const candidate = rotationPickCandidates[index];
+            return (
+              <OpenSlotCard
+                key={`open-slot-${index}`}
+                slotNumber={summary.counts.active + index + 1}
+                candidate={candidate}
+                queuePosition={candidate ? queuePositions.get(candidate.id) : undefined}
+              />
+            );
+          })}
+        </DashboardSection>
+        <DashboardActiveHealth summary={summary} settings={settings} />
+      </section>
+      <section className="grid gap-3 pt-3" aria-label="Upcoming games and queue planning">
+        <DashboardQueueStatus summary={summary} />
+        <RotationFillPanel games={games} settings={settings} />
+        <DashboardQueueRowsSection games={summary.nextWindowGames} />
+      </section>
+    </div>
   );
 }
 
@@ -151,7 +143,7 @@ function OpenSlotCard({
                 <span className="line-clamp-2">{candidate.title}</span>
               </Link>
               <DeckPlayabilitySummary game={candidate} className="mt-2 text-center sm:text-left" />
-              <DashboardPlaytimeDetails game={candidate} className="mt-2" />
+              <DashboardPlaytimeSummary game={candidate} className="mt-2 justify-center sm:justify-start" />
             </div>
             <form action={addRotationSuggestionToRotationAction}>
               <input type="hidden" name="gameId" value={candidate.id} />

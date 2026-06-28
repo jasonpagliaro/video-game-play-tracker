@@ -167,6 +167,11 @@ export function formatProtonDbScore(score: number | null | undefined) {
   return `${Math.round(score * 100)}%`;
 }
 
+export function formatProtonDbReportCount(count: number | null | undefined) {
+  if (count == null) return "-";
+  return `${count.toLocaleString("en-US")} ${count === 1 ? "report" : "reports"}`;
+}
+
 function normalizeDisplayType(value: unknown): SteamDeckCompatibilityItem["status"] {
   const parsed = typeof value === "number" ? value : Number(value);
   if (parsed === 2) return "unsupported";

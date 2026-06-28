@@ -1,12 +1,8 @@
-// @vitest-environment jsdom
 import { createElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import {
-  DashboardPlaytimeDetails,
-  DashboardPlaytimeDetailsProvider,
-} from "@/components/dashboard/playtime-details";
+import { DashboardPlaytimeSummary } from "@/components/dashboard/playtime-details";
 import type { GameSummary } from "@/lib/backlog/types";
 
 const baseGame: Pick<
@@ -20,40 +16,51 @@ const baseGame: Pick<
   completionType: "completable",
 };
 
-describe("DashboardPlaytimeDetails", () => {
-  it("expands and collapses all playtime details from any toggle", () => {
-    render(
-      createElement(
-        DashboardPlaytimeDetailsProvider,
-        null,
-        createElement(
-          "div",
-          null,
-          createElement(DashboardPlaytimeDetails, { game: baseGame }),
-          createElement(DashboardPlaytimeDetails, {
-            game: { ...baseGame, playtimeMinutes: 150, estimatedHours: 4 },
-          }),
-        ),
-      ),
+describe("DashboardPlaytimeSummary", () => {
+  it("renders progress-oriented summary chips when an estimate exists", () => {
+    const html = renderToStaticMarkup(createElement(DashboardPlaytimeSummary, { game: baseGame }));
+
+    expect(html).toContain('data-dashboard-playtime-summary="playtime"');
+    expect(html).toContain("Played");
+    expect(html).toContain("45m");
+    expect(html).toContain("Progress");
+    expect(html).toContain("38%");
+    expect(html).toContain("Remaining");
+    expect(html).toContain("1.3h");
+    expect(html).not.toContain("Play time");
+    expect(html).not.toContain("aria-expanded");
+  });
+
+  it("falls back to played time only when no estimate exists", () => {
+    const html = renderToStaticMarkup(
+      createElement(DashboardPlaytimeSummary, {
+        game: { ...baseGame, estimatedHours: null, backlogSlot: undefined, completionType: undefined },
+      }),
     );
 
-    const closedButtons = screen.getAllByRole("button", { name: "Show play time details" });
-    expect(closedButtons).toHaveLength(2);
-    expect(closedButtons.every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
-    expect(screen.queryAllByText("Played")).toHaveLength(0);
+    expect(html).toContain("Played");
+    expect(html).toContain("45m");
+    expect(html).not.toContain("Progress");
+    expect(html).not.toContain("Remaining");
+  });
 
-    fireEvent.click(closedButtons[0]!);
+  it("shows open-ended games as ongoing", () => {
+    const html = renderToStaticMarkup(
+      createElement(DashboardPlaytimeSummary, {
+        game: {
+          ...baseGame,
+          playtimeMinutes: 600,
+          estimatedHours: null,
+          backlogSlot: "parking_lot",
+          completionType: "live_service",
+        },
+      }),
+    );
 
-    const openButtons = screen.getAllByRole("button", { name: "Hide play time details" });
-    expect(openButtons).toHaveLength(2);
-    expect(openButtons.every((button) => button.getAttribute("aria-expanded") === "true")).toBe(true);
-    expect(screen.getAllByText("Played")).toHaveLength(2);
-
-    fireEvent.click(openButtons[1]!);
-
-    const closedAgainButtons = screen.getAllByRole("button", { name: "Show play time details" });
-    expect(closedAgainButtons).toHaveLength(2);
-    expect(closedAgainButtons.every((button) => button.getAttribute("aria-expanded") === "false")).toBe(true);
-    expect(screen.queryAllByText("Played")).toHaveLength(0);
+    expect(html).toContain("Played");
+    expect(html).toContain("10h");
+    expect(html).toContain("Status");
+    expect(html).toContain("Ongoing");
+    expect(html).not.toContain("Progress");
   });
 });
