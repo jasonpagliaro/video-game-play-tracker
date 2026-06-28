@@ -120,7 +120,8 @@ export function insertGamesWithCategoryBalance(
   const candidates = [...existingQueue.filter((game) => !game.queueLocked), ...newGames]
     .filter((game) => game.queueRank != null || newGames.some((candidate) => candidate.id === game.id))
     .sort(compareCandidatesForStableFallback);
-  const totalLength = locked.length + candidates.length;
+  const maxLockedPosition = Math.max(-1, ...locked.map((game) => rankToIndex(game.queueRank ?? 0, rankStep)));
+  const totalLength = Math.max(locked.length + candidates.length, maxLockedPosition + 1);
   const target = calculateCategoryDistribution(candidates);
   const result: QueueCandidate[] = [];
   const explanations: QueueExplanation[] = [];
@@ -140,7 +141,7 @@ export function insertGamesWithCategoryBalance(
       }))
       .sort(compareScoredCandidates);
     const next = scored[0];
-    if (!next) break;
+    if (!next) continue;
     const rank = (index + 1) * rankStep;
     result.push({ ...next.candidate, queueRank: rank });
     explanations.push({

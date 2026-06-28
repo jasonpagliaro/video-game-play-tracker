@@ -26,6 +26,7 @@ import {
 import {
   filterQueueEligibleCandidates,
   insertGamesWithCategoryBalance,
+  QUEUE_RULES,
   reorderQueueByCommand,
   rebalanceQueue as rebalanceQueueLogic,
   sortQueueByPreset,
@@ -1300,12 +1301,29 @@ async function persistQueueRanks(
     .where(and(eq(games.userId, userId), sql`${games.queueRank} is not null`))
     .orderBy(asc(games.queueRank), asc(games.id));
   const finalIds = new Set(rankedQueue.map((item) => item.id));
-  const finalRanks = new Set(rankedQueue.map((item) => item.queueRank));
-  const rowsToRestore = currentQueueRows.filter((row) => !finalIds.has(row.id));
-  const overlappingMissingRows = rowsToRestore.filter((row) => row.queueRank != null && finalRanks.has(row.queueRank));
-  if (overlappingMissingRows.length > 0) {
-    throw new Error("Queue rebalance did not include every game needed to rewrite ranks.");
-  }
+  const assignedRanks = new Set<number>(
+    rankedQueue.map((item) => item.queueRank).filter((rank): rank is number => rank != null),
+  );
+  let nextRestoreRank =
+    Math.max(0, ...assignedRanks, ...currentQueueRows.map((row) => row.queueRank ?? 0)) + QUEUE_RULES.rankStep;
+  const takeNextRestoreRank = () => {
+    while (assignedRanks.has(nextRestoreRank)) {
+      nextRestoreRank += QUEUE_RULES.rankStep;
+    }
+    const rank = nextRestoreRank;
+    assignedRanks.add(rank);
+    nextRestoreRank += QUEUE_RULES.rankStep;
+    return rank;
+  };
+  const rowsToRestore = currentQueueRows
+    .filter((row) => !finalIds.has(row.id))
+    .map((row) => {
+      if (row.queueRank != null && !assignedRanks.has(row.queueRank)) {
+        assignedRanks.add(row.queueRank);
+        return row;
+      }
+      return { ...row, queueRank: takeNextRestoreRank() };
+    });
 
   for (let index = 0; index < currentQueueRows.length; index += 1) {
     await tx

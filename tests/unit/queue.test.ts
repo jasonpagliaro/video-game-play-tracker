@@ -207,6 +207,21 @@ describe("queue balancing", () => {
     expect(new Set(ranks).size).toBe(ranks.length);
   });
 
+  it("preserves sparse locked positions during app recommendation rebalance", () => {
+    const queue = [
+      game("low-a", "action", 10, { queueRank: 1000 }),
+      game("low-b", "puzzle", 10, { queueRank: 2000 }),
+      game("locked", "horror", 100, { queueLocked: true, queueRank: 5000 }),
+    ];
+
+    const ranked = rebalanceQueue(queue).queue;
+    const ranks = ranked.map((item) => item.queueRank);
+
+    expect(ranked).toHaveLength(queue.length);
+    expect(ranked.find((item) => item.id === "locked")?.queueRank).toBe(5000);
+    expect(new Set(ranks).size).toBe(ranks.length);
+  });
+
   it("keeps locked items fixed while sorting movable queue items", () => {
     const queue = [
       game("low", "action", 10, { queueRank: 1000 }),
