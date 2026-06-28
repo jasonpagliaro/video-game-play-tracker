@@ -146,7 +146,7 @@ function OpenSlotCard({
                 <span className="line-clamp-2">{candidate.title}</span>
               </Link>
               <div className="mt-2 flex flex-wrap justify-center gap-2 text-xs text-muted-foreground sm:justify-start">
-                <span>Score {candidate.priorityScore}</span>
+                <span>Priority score {candidate.priorityScore}</span>
               </div>
               <DashboardPlaytimeDetails game={candidate} className="mt-2" />
             </div>

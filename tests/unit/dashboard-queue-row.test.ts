@@ -56,7 +56,7 @@ describe("DashboardQueueRow", () => {
     expect(html).toContain("A Short Hike");
     expect(html).toContain("Short / Palate Cleanser");
     expect(html).toContain("Completable");
-    expect(html).toContain("Score 88");
+    expect(html).toContain("Priority score 88");
     expect(html).not.toContain("Playtime 45m");
     expect(html).not.toContain("Est 2h");
     expect(detailsIndex).toBeGreaterThan(-1);
@@ -70,5 +70,27 @@ describe("DashboardQueueRow", () => {
     expect(html).toContain("Steam");
     expect(html).not.toContain("Steam header artwork");
     expect(html).not.toContain("<img");
+  });
+
+  it("renders the official Steam Deck tag on queue rows when available", () => {
+    const html = renderToStaticMarkup(
+      createElement(DashboardQueueRow, {
+        game: {
+          ...game,
+          steamDeckCompatibilityCategory: "playable",
+          protondbTier: "gold",
+          protondbConfidence: "strong",
+          protondbScore: 0.78,
+          protondbReportCount: 20,
+        },
+        position: 2,
+      }),
+    );
+
+    expect(html).toContain('data-dashboard-deck-badge="playability"');
+    expect(html).toContain("Deck Playable");
+    expect(html).not.toContain("Deck Gold");
+    expect(html).toContain("Deck experience");
+    expect(html).not.toContain('data-dashboard-deck-metrics="playability"');
   });
 });

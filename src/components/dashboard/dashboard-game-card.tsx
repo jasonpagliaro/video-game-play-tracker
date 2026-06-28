@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { GameSummary } from "@/lib/backlog/types";
-import { getSteamIdentityLabel, getSteamInstallUrl, getSteamLaunchUrl, getSteamStoreUrl } from "@/lib/steam/assets";
+import { getSteamInstallUrl, getSteamLaunchUrl, getSteamStoreUrl } from "@/lib/steam/assets";
 import { cn } from "@/lib/utils";
 
 export function DashboardGameCard({
@@ -52,9 +52,8 @@ export function DashboardGameCard({
           </div>
 
           <div className="grid gap-1 text-xs text-muted-foreground">
-            <div className="flex items-center justify-between gap-2">
-              <span className="truncate font-mono">{getSteamIdentityLabel(game.steamAppId)}</span>
-              <span className="shrink-0">Score {game.priorityScore}</span>
+            <div className="flex items-center justify-end gap-2">
+              <span className="shrink-0">Priority score {game.priorityScore}</span>
             </div>
             <div className="flex items-center gap-3">
               <Link href={`/games/${game.id}`} className="font-medium text-foreground underline-offset-4 hover:underline">
@@ -152,9 +151,8 @@ export function DashboardGameCard({
             <DashboardPlaytimeDetails game={game} />
             <DashboardDeckPlayabilityDetails game={game} />
 
-            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span className="truncate font-mono">{getSteamIdentityLabel(game.steamAppId)}</span>
-              <span className="shrink-0">Score {game.priorityScore}</span>
+            <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
+              <span className="shrink-0">Priority score {game.priorityScore}</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -207,8 +205,8 @@ function DashboardBadgeStrip({
           <CompletionTypeBadge completionType={game.completionType} />
         </div>
         <div data-dashboard-badge-row="slot" className="flex min-w-0 gap-1.5 overflow-hidden">
-          <SlotBadge slot={game.backlogSlot} />
           <DeckPlayabilityBadge game={game} />
+          <SlotBadge slot={game.backlogSlot} />
         </div>
       </div>
     );
@@ -217,9 +215,9 @@ function DashboardBadgeStrip({
   return (
     <div data-dashboard-badge-strip="default" className="flex min-h-[2.875rem] flex-wrap content-start gap-1.5 overflow-hidden">
       <StatusBadge status={game.status} />
+      <DeckPlayabilityBadge game={game} />
       <SlotBadge slot={game.backlogSlot} />
       <CompletionTypeBadge completionType={game.completionType} />
-      <DeckPlayabilityBadge game={game} />
     </div>
   );
 }

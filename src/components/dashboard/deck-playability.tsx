@@ -115,7 +115,7 @@ export function DashboardDeckPlayabilityDetails({
             <Metric label="ProtonDB" value={getProtonDbTierLabel(game.protondbTier)} />
             <Metric label="Confidence" value={game.protondbConfidence ? titleCase(game.protondbConfidence) : "-"} />
             <Metric label="Reports" value={game.protondbReportCount?.toString() ?? "-"} />
-            <Metric label="Score" value={formatProtonDbScore(game.protondbScore)} />
+            <Metric label="ProtonDB score" value={formatProtonDbScore(game.protondbScore)} />
             <Metric label="Updated" value={formatDate(game.deckPlayabilityUpdatedAt)} />
           </div>
           {criteria.length ? (

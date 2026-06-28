@@ -61,8 +61,8 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Show play time details");
     expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).toContain("Details");
-    expect(html).toContain("Steam App 227580");
-    expect(html).toContain("Score 58");
+    expect(html).not.toContain("Steam App 227580");
+    expect(html).toContain("Priority score 58");
   });
 
   it("renders active-rotation compact cards without the details disclosure", () => {
@@ -83,6 +83,7 @@ describe("DashboardGameCard", () => {
     expect(html).not.toContain("Details");
     expect(html).not.toContain("Steam App 227580");
     expect(html).not.toContain("Score 58");
+    expect(html).not.toContain("Priority score 58");
   });
 
   it("renders active cards with playtime hidden behind a disclosure and actions visible", () => {
@@ -117,8 +118,8 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Play time");
     expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).not.toContain("Saved estimate");
-    expect(html).toContain("Steam App 227580");
-    expect(html).toContain("Score 58");
+    expect(html).not.toContain("Steam App 227580");
+    expect(html).toContain("Priority score 58");
     expect(html).toContain("Open");
     expect(html).toContain("Steam");
     expect(html).toContain("Install");
@@ -152,6 +153,7 @@ describe("DashboardGameCard", () => {
 
     expect(html).toContain('data-dashboard-deck-badge="playability"');
     expect(html).toContain("Deck Verified");
+    expect(html.indexOf("Deck Verified")).toBeLessThan(html.indexOf("Short / Palate Cleanser"));
     expect(html).toContain('data-dashboard-deck-details="playability"');
     expect(html).toContain("Show Steam Deck details");
     expect(html).toContain("Deck experience");

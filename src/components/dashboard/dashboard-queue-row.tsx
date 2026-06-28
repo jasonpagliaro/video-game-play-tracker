@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
+import { DashboardDeckPlayabilityDetails, DeckPlayabilityBadge } from "@/components/dashboard/deck-playability";
 import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,13 +31,15 @@ export function DashboardQueueRow({
           <StatusBadge status={game.status} />
         </div>
         <div className="mt-2 flex flex-wrap gap-1.5">
+          <DeckPlayabilityBadge game={game} />
           <SlotBadge slot={game.backlogSlot} />
           <CompletionTypeBadge completionType={game.completionType} />
         </div>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>Score {game.priorityScore}</span>
+          <span>Priority score {game.priorityScore}</span>
         </div>
         <DashboardPlaytimeDetails game={game} className="mt-2" metricsClassName="sm:grid-cols-5" />
+        <DashboardDeckPlayabilityDetails game={game} className="mt-2" metricsClassName="sm:grid-cols-5" />
       </div>
       <div className="flex flex-wrap gap-2 md:justify-end">
         <Button asChild size="sm" variant="outline">
