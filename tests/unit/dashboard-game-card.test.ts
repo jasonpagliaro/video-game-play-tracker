@@ -62,7 +62,7 @@ describe("DashboardGameCard", () => {
     expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).toContain("Details");
     expect(html).not.toContain("Steam App 227580");
-    expect(html).toContain("Priority score 58");
+    expect(html).toContain("Queue priority 58");
   });
 
   it("renders active-rotation compact cards without the details disclosure", () => {
@@ -83,7 +83,7 @@ describe("DashboardGameCard", () => {
     expect(html).not.toContain("Details");
     expect(html).not.toContain("Steam App 227580");
     expect(html).not.toContain("Score 58");
-    expect(html).not.toContain("Priority score 58");
+    expect(html).not.toContain("Queue priority 58");
   });
 
   it("renders active cards with playtime hidden behind a disclosure and actions visible", () => {
@@ -119,7 +119,7 @@ describe("DashboardGameCard", () => {
     expect(html).not.toContain('data-dashboard-playtime-metrics="playtime"');
     expect(html).not.toContain("Saved estimate");
     expect(html).not.toContain("Steam App 227580");
-    expect(html).toContain("Priority score 58");
+    expect(html).toContain("Queue priority 58");
     expect(html).toContain("Open");
     expect(html).toContain("Steam");
     expect(html).toContain("Install");

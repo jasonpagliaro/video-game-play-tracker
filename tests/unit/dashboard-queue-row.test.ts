@@ -56,7 +56,7 @@ describe("DashboardQueueRow", () => {
     expect(html).toContain("A Short Hike");
     expect(html).toContain("Short / Palate Cleanser");
     expect(html).toContain("Completable");
-    expect(html).toContain("Priority score 88");
+    expect(html).toContain("Queue priority 88");
     expect(html).not.toContain("Playtime 45m");
     expect(html).not.toContain("Est 2h");
     expect(detailsIndex).toBeGreaterThan(-1);

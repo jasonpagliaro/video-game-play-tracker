@@ -109,7 +109,7 @@ function RotationSuggestionRow({
           <span>Skipped {game.rotationSkipCount}/{settings.rotationSkipLimit}</span>
           <span>Playtime {formatMinutes(game.playtimeMinutes)}</span>
           <span>Last {formatDate(game.lastPlayed)}</span>
-          <span>Priority score {game.priorityScore}</span>
+          <span>Queue priority {game.priorityScore}</span>
         </div>
       </div>
       <div className="flex flex-wrap gap-2 lg:justify-end">

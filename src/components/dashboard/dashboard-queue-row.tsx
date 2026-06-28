@@ -36,7 +36,7 @@ export function DashboardQueueRow({
           <CompletionTypeBadge completionType={game.completionType} />
         </div>
         <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          <span>Priority score {game.priorityScore}</span>
+          <span>Queue priority {game.priorityScore}</span>
         </div>
         <DashboardPlaytimeDetails game={game} className="mt-2" metricsClassName="sm:grid-cols-5" />
         <DashboardDeckPlayabilityDetails game={game} className="mt-2" metricsClassName="sm:grid-cols-5" />

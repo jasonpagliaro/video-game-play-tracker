@@ -53,7 +53,7 @@ export function DashboardGameCard({
 
           <div className="grid gap-1 text-xs text-muted-foreground">
             <div className="flex items-center justify-end gap-2">
-              <span className="shrink-0">Priority score {game.priorityScore}</span>
+              <span className="shrink-0">Queue priority {game.priorityScore}</span>
             </div>
             <div className="flex items-center gap-3">
               <Link href={`/games/${game.id}`} className="font-medium text-foreground underline-offset-4 hover:underline">
@@ -152,7 +152,7 @@ export function DashboardGameCard({
             <DashboardDeckPlayabilityDetails game={game} />
 
             <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground">
-              <span className="shrink-0">Priority score {game.priorityScore}</span>
+              <span className="shrink-0">Queue priority {game.priorityScore}</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
