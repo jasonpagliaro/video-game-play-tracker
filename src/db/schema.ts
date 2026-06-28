@@ -26,6 +26,7 @@ import {
   SYNC_STATUSES,
   SYNC_TYPES,
 } from "@/lib/backlog/constants";
+import type { SteamDeckCompatibilityCategory, SteamDeckCompatibilityItem } from "@/lib/steam/deck-playability";
 
 export const gameStatusEnum = pgEnum("game_status", GAME_STATUSES);
 export const backlogSlotEnum = pgEnum("backlog_slot", BACKLOG_SLOTS);
@@ -115,6 +116,14 @@ export const games = pgTable(
     releaseYear: integer("release_year"),
     genres: jsonb("genres").$type<string[] | null>(),
     tags: jsonb("tags").$type<string[] | null>(),
+    steamDeckCompatibilityCategory: text("steam_deck_compatibility_category").$type<SteamDeckCompatibilityCategory | null>(),
+    steamDeckCompatibilityItems: jsonb("steam_deck_compatibility_items").$type<SteamDeckCompatibilityItem[] | null>(),
+    protondbTier: text("protondb_tier"),
+    protondbConfidence: text("protondb_confidence"),
+    protondbScore: doublePrecision("protondb_score"),
+    protondbReportCount: integer("protondb_report_count"),
+    deckPlayabilityUpdatedAt: timestamp("deck_playability_updated_at", { withTimezone: true }),
+    deckPlayabilityRaw: jsonb("deck_playability_raw").$type<Record<string, unknown> | null>(),
     estimatedHours: doublePrecision("estimated_hours"),
     completionType: completionTypeEnum("completion_type").notNull().default("unknown"),
     backlogSlot: backlogSlotEnum("backlog_slot").notNull().default("experimental"),
@@ -161,6 +170,14 @@ export const games = pgTable(
       .where(sql`${table.queueRank} is not null`),
     check("games_playtime_nonnegative", sql`${table.playtimeMinutes} >= 0`),
     check("games_rotation_skip_count_nonnegative", sql`${table.rotationSkipCount} >= 0`),
+    check(
+      "games_protondb_report_count_nonnegative",
+      sql`${table.protondbReportCount} is null or ${table.protondbReportCount} >= 0`,
+    ),
+    check(
+      "games_protondb_score_range",
+      sql`${table.protondbScore} is null or (${table.protondbScore} >= 0 and ${table.protondbScore} <= 1)`,
+    ),
   ],
 );
 

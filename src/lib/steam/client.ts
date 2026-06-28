@@ -6,6 +6,7 @@ import {
   type SteamAccountProfile,
   type SteamLibraryPreview,
 } from "./library";
+import { fetchDeckPlayabilityForAppIds } from "./deck-playability-fetch";
 import {
   isRecord,
   normalizeSteamStoreAppMetadata,
@@ -51,10 +52,14 @@ export async function fetchSteamLibraryPreview(
   const steamid64 = parsed.kind === "steamid64" ? parsed.steamid64 : await resolveVanityUrl(parsed.vanity);
   const account = await fetchPlayerSummary(steamid64);
   const games = await fetchOwnedGames(steamid64);
-  const metadata =
+  const appIds = games.map((game) => Number(game.appid));
+  const [metadata, deckPlayability] =
     options.enrichMetadata === false
-      ? { metadataByAppId: new Map(), failedAppIds: new Set<number>() }
-      : await fetchSteamStoreMetadataForAppIds(games.map((game) => Number(game.appid)));
+      ? [
+          { metadataByAppId: new Map(), failedAppIds: new Set<number>() },
+          { playabilityByAppId: new Map(), failedAppIds: new Set<number>() },
+        ]
+      : await Promise.all([fetchSteamStoreMetadataForAppIds(appIds), fetchDeckPlayabilityForAppIds(appIds)]);
 
   return buildSteamLibraryPreview({
     identifier,
@@ -62,6 +67,8 @@ export async function fetchSteamLibraryPreview(
     games,
     storeMetadataByAppId: metadata.metadataByAppId,
     metadataFailedAppIds: metadata.failedAppIds,
+    deckPlayabilityByAppId: deckPlayability.playabilityByAppId,
+    deckPlayabilityFailedAppIds: deckPlayability.failedAppIds,
     sampleLimit: options.sampleLimit,
   });
 }

@@ -1,5 +1,6 @@
 import { calculatePriorityScore, inferBacklogSlot, inferCompletionType } from "@/lib/backlog/inference";
 import type { BacklogSlot, CompletionType } from "@/lib/backlog/constants";
+import { EMPTY_DECK_PLAYABILITY, type DeckPlayabilityData } from "./deck-playability";
 import type { SteamStoreMetadata } from "./metadata";
 
 export type SteamAccountProfile = {
@@ -24,6 +25,14 @@ export type SteamLibraryGame = {
   releaseYear: number | null;
   genres: string[] | null;
   tags: string[] | null;
+  steamDeckCompatibilityCategory: DeckPlayabilityData["steamDeckCompatibilityCategory"];
+  steamDeckCompatibilityItems: DeckPlayabilityData["steamDeckCompatibilityItems"];
+  protondbTier: string | null;
+  protondbConfidence: string | null;
+  protondbScore: number | null;
+  protondbReportCount: number | null;
+  deckPlayabilityUpdatedAt: Date | null;
+  deckPlayabilityRaw: Record<string, unknown> | null;
   completionType: CompletionType;
   backlogSlot: BacklogSlot;
   priorityScore: number;
@@ -47,6 +56,8 @@ export type SteamLibrarySyncData = {
   skippedCount: number;
   metadataEnrichedCount: number;
   metadataFailedCount: number;
+  deckPlayabilityEnrichedCount: number;
+  deckPlayabilityFailedCount: number;
   privateOrEmpty: boolean;
 };
 
@@ -60,6 +71,8 @@ export function buildSteamLibraryPreview(input: {
   games: RawSteamOwnedGame[];
   storeMetadataByAppId?: Map<number, SteamStoreMetadata>;
   metadataFailedAppIds?: Set<number>;
+  deckPlayabilityByAppId?: Map<number, DeckPlayabilityData>;
+  deckPlayabilityFailedAppIds?: Set<number>;
   sampleLimit?: number;
 }): SteamLibraryPreview {
   const rows: SteamLibraryPreviewRow[] = [];
@@ -67,16 +80,23 @@ export function buildSteamLibraryPreview(input: {
   let skippedCount = 0;
   let metadataEnrichedCount = 0;
   let metadataFailedCount = 0;
+  let deckPlayabilityEnrichedCount = 0;
+  let deckPlayabilityFailedCount = 0;
 
   input.games.forEach((raw, index) => {
     const steamAppId = parsePositiveInteger(raw.appid);
     const metadata = steamAppId == null ? undefined : input.storeMetadataByAppId?.get(steamAppId);
     const metadataFailed = steamAppId == null ? false : input.metadataFailedAppIds?.has(steamAppId) === true;
-    const result = normalizeSteamOwnedGame(raw, input.account.steamid64, metadata);
+    const deckPlayability = steamAppId == null ? undefined : input.deckPlayabilityByAppId?.get(steamAppId);
+    const deckPlayabilityFailed =
+      steamAppId == null ? false : input.deckPlayabilityFailedAppIds?.has(steamAppId) === true;
+    const result = normalizeSteamOwnedGame(raw, input.account.steamid64, metadata, deckPlayability);
     if (result.valid) {
       normalizedGames.push(result.normalized);
       if (metadata) metadataEnrichedCount += 1;
       if (!metadata && metadataFailed) metadataFailedCount += 1;
+      if (deckPlayability) deckPlayabilityEnrichedCount += 1;
+      if (!deckPlayability && deckPlayabilityFailed) deckPlayabilityFailedCount += 1;
       if (rows.length < (input.sampleLimit ?? 100)) {
         rows.push({ rowNumber: index + 1, valid: true, raw, normalized: result.normalized });
       }
@@ -97,6 +117,8 @@ export function buildSteamLibraryPreview(input: {
     skippedCount,
     metadataEnrichedCount,
     metadataFailedCount,
+    deckPlayabilityEnrichedCount,
+    deckPlayabilityFailedCount,
     privateOrEmpty: input.games.length === 0,
     rows,
   };
@@ -106,6 +128,7 @@ export function normalizeSteamOwnedGame(
   raw: RawSteamOwnedGame,
   steamid64Owner: string,
   metadata?: SteamStoreMetadata,
+  deckPlayability?: DeckPlayabilityData,
 ): { valid: true; normalized: SteamLibraryGame } | { valid: false; reason: string } {
   const steamAppId = parsePositiveInteger(raw.appid);
   if (steamAppId == null) return { valid: false, reason: "Missing app id" };
@@ -122,6 +145,7 @@ export function normalizeSteamOwnedGame(
   const tags = metadata?.tags ?? null;
   const steamReviewScore = metadata?.steamReviewScore ?? null;
   const releaseYear = metadata?.releaseYear ?? null;
+  const deck = deckPlayability ?? EMPTY_DECK_PLAYABILITY;
   const completionType = inferCompletionType({ title, tags, genres });
   const backlogSlot = inferBacklogSlot({ title, tags, genres, completionType, playtimeMinutes });
   const priorityScore = calculatePriorityScore({
@@ -146,6 +170,14 @@ export function normalizeSteamOwnedGame(
       releaseYear,
       genres,
       tags,
+      steamDeckCompatibilityCategory: deck.steamDeckCompatibilityCategory,
+      steamDeckCompatibilityItems: deck.steamDeckCompatibilityItems,
+      protondbTier: deck.protondbTier,
+      protondbConfidence: deck.protondbConfidence,
+      protondbScore: deck.protondbScore,
+      protondbReportCount: deck.protondbReportCount,
+      deckPlayabilityUpdatedAt: deck.deckPlayabilityUpdatedAt,
+      deckPlayabilityRaw: deck.deckPlayabilityRaw,
       completionType,
       backlogSlot,
       priorityScore,
@@ -154,6 +186,7 @@ export function normalizeSteamOwnedGame(
         owner: steamid64Owner,
         steam: raw,
         ...(metadata ? { store: metadata.raw } : {}),
+        ...(deck.deckPlayabilityRaw ? { deck_playability: deck.deckPlayabilityRaw } : {}),
       },
     },
   };

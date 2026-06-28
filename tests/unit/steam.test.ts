@@ -117,6 +117,8 @@ describe("Steam library normalization", () => {
     expect(preview.skippedCount).toBe(0);
     expect(preview.metadataEnrichedCount).toBe(0);
     expect(preview.metadataFailedCount).toBe(0);
+    expect(preview.deckPlayabilityEnrichedCount).toBe(0);
+    expect(preview.deckPlayabilityFailedCount).toBe(0);
     expect(preview.rows).toEqual([]);
   });
 
@@ -188,6 +190,53 @@ describe("Steam library normalization", () => {
     expect(preview.metadataEnrichedCount).toBe(0);
     expect(preview.metadataFailedCount).toBe(1);
     expect(preview.rows[0]?.normalized?.title).toBe("Valid Game");
+  });
+
+  it("enriches owned games with Steam Deck playability metadata", () => {
+    const updatedAt = new Date("2026-06-27T00:00:00Z");
+    const preview = buildSteamLibraryPreview({
+      identifier: steamid64,
+      account: {
+        steamid64,
+        displayName: "Test User",
+        customProfileId: null,
+        profileUrl: null,
+      },
+      games: [{ appid: 227580, name: "10,000,000", playtime_forever: 10 }],
+      deckPlayabilityByAppId: new Map([
+        [
+          227580,
+          {
+            steamDeckCompatibilityCategory: "playable",
+            steamDeckCompatibilityItems: [
+              {
+                status: "warning",
+                label: "Native resolution is not the default",
+                locToken: "#SteamDeckVerified_TestResult_NativeResolutionNotDefault",
+                rawDisplayType: 3,
+              },
+            ],
+            protondbTier: "platinum",
+            protondbConfidence: "low",
+            protondbScore: 0.51,
+            protondbReportCount: 6,
+            deckPlayabilityUpdatedAt: updatedAt,
+            deckPlayabilityRaw: { steam: { resolved_category: 2 }, protondb: { tier: "platinum" } },
+          },
+        ],
+      ]),
+    });
+
+    expect(preview.deckPlayabilityEnrichedCount).toBe(1);
+    expect(preview.deckPlayabilityFailedCount).toBe(0);
+    expect(preview.rows[0]?.normalized?.steamDeckCompatibilityCategory).toBe("playable");
+    expect(preview.rows[0]?.normalized?.steamDeckCompatibilityItems?.[0]?.status).toBe("warning");
+    expect(preview.rows[0]?.normalized?.protondbTier).toBe("platinum");
+    expect(preview.rows[0]?.normalized?.deckPlayabilityUpdatedAt).toBe(updatedAt);
+    expect(preview.rows[0]?.normalized?.rawImportMetadata.deck_playability).toEqual({
+      steam: { resolved_category: 2 },
+      protondb: { tier: "platinum" },
+    });
   });
 });
 

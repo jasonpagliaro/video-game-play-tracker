@@ -85,6 +85,8 @@ export type SteamImportApplyResult = ImportApplyResult & {
   queuedCount: number;
   metadataEnrichedCount: number;
   metadataFailedCount: number;
+  deckPlayabilityEnrichedCount: number;
+  deckPlayabilityFailedCount: number;
 };
 
 export type DueSteamAutoRefreshAccount = {
@@ -588,6 +590,14 @@ export async function applyCsvImport(input: {
             releaseYear: row.normalized.releaseYear,
             genres: row.normalized.genres,
             tags: row.normalized.tags,
+            steamDeckCompatibilityCategory: row.normalized.steamDeckCompatibilityCategory,
+            steamDeckCompatibilityItems: row.normalized.steamDeckCompatibilityItems,
+            protondbTier: row.normalized.protondbTier,
+            protondbConfidence: row.normalized.protondbConfidence,
+            protondbScore: row.normalized.protondbScore,
+            protondbReportCount: row.normalized.protondbReportCount,
+            deckPlayabilityUpdatedAt: row.normalized.deckPlayabilityUpdatedAt,
+            deckPlayabilityRaw: row.normalized.deckPlayabilityRaw,
             achievementsUnlocked: row.normalized.achievementsUnlocked,
             achievementsTotal: row.normalized.achievementsTotal,
             achievementPercent: row.normalized.achievementPercent,
@@ -617,6 +627,14 @@ export async function applyCsvImport(input: {
             releaseYear: row.normalized.releaseYear,
             genres: row.normalized.genres,
             tags: row.normalized.tags,
+            steamDeckCompatibilityCategory: row.normalized.steamDeckCompatibilityCategory,
+            steamDeckCompatibilityItems: row.normalized.steamDeckCompatibilityItems,
+            protondbTier: row.normalized.protondbTier,
+            protondbConfidence: row.normalized.protondbConfidence,
+            protondbScore: row.normalized.protondbScore,
+            protondbReportCount: row.normalized.protondbReportCount,
+            deckPlayabilityUpdatedAt: row.normalized.deckPlayabilityUpdatedAt,
+            deckPlayabilityRaw: row.normalized.deckPlayabilityRaw,
             achievementsUnlocked: row.normalized.achievementsUnlocked,
             achievementsTotal: row.normalized.achievementsTotal,
             achievementPercent: row.normalized.achievementPercent,
@@ -680,6 +698,8 @@ export async function applySteamLibraryImport(input: {
       rowCount: input.library.rowCount,
       metadataEnrichedCount: input.library.metadataEnrichedCount,
       metadataFailedCount: input.library.metadataFailedCount,
+      deckPlayabilityEnrichedCount: input.library.deckPlayabilityEnrichedCount,
+      deckPlayabilityFailedCount: input.library.deckPlayabilityFailedCount,
     };
   }
 
@@ -709,6 +729,14 @@ export async function applySteamLibraryImport(input: {
             releaseYear: steamGame.releaseYear,
             genres: steamGame.genres,
             tags: steamGame.tags,
+            steamDeckCompatibilityCategory: steamGame.steamDeckCompatibilityCategory,
+            steamDeckCompatibilityItems: steamGame.steamDeckCompatibilityItems,
+            protondbTier: steamGame.protondbTier,
+            protondbConfidence: steamGame.protondbConfidence,
+            protondbScore: steamGame.protondbScore,
+            protondbReportCount: steamGame.protondbReportCount,
+            deckPlayabilityUpdatedAt: steamGame.deckPlayabilityUpdatedAt,
+            deckPlayabilityRaw: steamGame.deckPlayabilityRaw,
             ...classification,
             priorityScore: calculatePriorityScore({
               personalInterest: existing.personalInterest,
@@ -747,6 +775,14 @@ export async function applySteamLibraryImport(input: {
             releaseYear: steamGame.releaseYear,
             genres: steamGame.genres,
             tags: steamGame.tags,
+            steamDeckCompatibilityCategory: steamGame.steamDeckCompatibilityCategory,
+            steamDeckCompatibilityItems: steamGame.steamDeckCompatibilityItems,
+            protondbTier: steamGame.protondbTier,
+            protondbConfidence: steamGame.protondbConfidence,
+            protondbScore: steamGame.protondbScore,
+            protondbReportCount: steamGame.protondbReportCount,
+            deckPlayabilityUpdatedAt: steamGame.deckPlayabilityUpdatedAt,
+            deckPlayabilityRaw: steamGame.deckPlayabilityRaw,
             completionType: steamGame.completionType,
             backlogSlot: steamGame.backlogSlot,
             priorityScore: steamGame.priorityScore,
@@ -786,7 +822,7 @@ export async function applySteamLibraryImport(input: {
         addedCount,
         updatedCount,
         missingCount,
-        notes: `Decision: ${input.decision}; source: Steam Web API library sync; metadata enriched: ${input.library.metadataEnrichedCount}; metadata failed: ${input.library.metadataFailedCount}`,
+        notes: `Decision: ${input.decision}; source: Steam Web API library sync; metadata enriched: ${input.library.metadataEnrichedCount}; metadata failed: ${input.library.metadataFailedCount}; deck enriched: ${input.library.deckPlayabilityEnrichedCount}; deck failed: ${input.library.deckPlayabilityFailedCount}`,
       })
       .returning();
 
@@ -804,6 +840,8 @@ export async function applySteamLibraryImport(input: {
       rowCount: input.library.rowCount,
       metadataEnrichedCount: input.library.metadataEnrichedCount,
       metadataFailedCount: input.library.metadataFailedCount,
+      deckPlayabilityEnrichedCount: input.library.deckPlayabilityEnrichedCount,
+      deckPlayabilityFailedCount: input.library.deckPlayabilityFailedCount,
     };
   });
 }
@@ -1398,6 +1436,14 @@ function mapGame(row: GameRow): Game {
     releaseYear: row.releaseYear,
     genres: row.genres,
     tags: row.tags,
+    steamDeckCompatibilityCategory: row.steamDeckCompatibilityCategory,
+    steamDeckCompatibilityItems: row.steamDeckCompatibilityItems,
+    protondbTier: row.protondbTier,
+    protondbConfidence: row.protondbConfidence,
+    protondbScore: row.protondbScore,
+    protondbReportCount: row.protondbReportCount,
+    deckPlayabilityUpdatedAt: row.deckPlayabilityUpdatedAt,
+    deckPlayabilityRaw: row.deckPlayabilityRaw,
     estimatedHours: row.estimatedHours,
     completionType: row.completionType,
     backlogSlot: row.backlogSlot,
@@ -1457,6 +1503,14 @@ function mapGameSummary(row: GameRow): GameSummary {
     steamReviewScore: game.steamReviewScore,
     steamReviewSummary: game.steamReviewSummary,
     releaseYear: game.releaseYear,
+    steamDeckCompatibilityCategory: game.steamDeckCompatibilityCategory,
+    steamDeckCompatibilityItems: game.steamDeckCompatibilityItems,
+    protondbTier: game.protondbTier,
+    protondbConfidence: game.protondbConfidence,
+    protondbScore: game.protondbScore,
+    protondbReportCount: game.protondbReportCount,
+    deckPlayabilityUpdatedAt: game.deckPlayabilityUpdatedAt,
+    deckPlayabilityRaw: game.deckPlayabilityRaw,
     lastPlayed: game.lastPlayed,
     dateAdded: game.dateAdded,
     lastSyncedAt: game.lastSyncedAt,

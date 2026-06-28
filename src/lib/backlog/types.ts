@@ -5,6 +5,7 @@ import type {
   PersonalInterest,
   SyncState,
 } from "./constants";
+import type { SteamDeckCompatibilityCategory, SteamDeckCompatibilityItem } from "@/lib/steam/deck-playability";
 
 export type AppSettings = {
   id?: string;
@@ -51,6 +52,14 @@ export type Game = {
   releaseYear: number | null;
   genres: string[] | null;
   tags: string[] | null;
+  steamDeckCompatibilityCategory: SteamDeckCompatibilityCategory | null;
+  steamDeckCompatibilityItems: SteamDeckCompatibilityItem[] | null;
+  protondbTier: string | null;
+  protondbConfidence: string | null;
+  protondbScore: number | null;
+  protondbReportCount: number | null;
+  deckPlayabilityUpdatedAt: Date | null;
+  deckPlayabilityRaw: Record<string, unknown> | null;
   estimatedHours: number | null;
   completionType: CompletionType;
   backlogSlot: BacklogSlot;
@@ -108,6 +117,14 @@ export type GameSummary = Pick<
   | "steamReviewScore"
   | "steamReviewSummary"
   | "releaseYear"
+  | "steamDeckCompatibilityCategory"
+  | "steamDeckCompatibilityItems"
+  | "protondbTier"
+  | "protondbConfidence"
+  | "protondbScore"
+  | "protondbReportCount"
+  | "deckPlayabilityUpdatedAt"
+  | "deckPlayabilityRaw"
   | "lastPlayed"
   | "dateAdded"
   | "lastSyncedAt"
@@ -145,6 +162,14 @@ export type ParsedCsvGame = {
   releaseYear: number | null;
   genres: string[] | null;
   tags: string[] | null;
+  steamDeckCompatibilityCategory: SteamDeckCompatibilityCategory | null;
+  steamDeckCompatibilityItems: SteamDeckCompatibilityItem[] | null;
+  protondbTier: string | null;
+  protondbConfidence: string | null;
+  protondbScore: number | null;
+  protondbReportCount: number | null;
+  deckPlayabilityUpdatedAt: Date | null;
+  deckPlayabilityRaw: Record<string, unknown> | null;
   achievementsUnlocked: number | null;
   achievementsTotal: number | null;
   achievementPercent: number | null;

@@ -29,6 +29,14 @@ const game: GameSummary = {
   steamReviewScore: null,
   steamReviewSummary: null,
   releaseYear: null,
+  steamDeckCompatibilityCategory: null,
+  steamDeckCompatibilityItems: null,
+  protondbTier: null,
+  protondbConfidence: null,
+  protondbScore: null,
+  protondbReportCount: null,
+  deckPlayabilityUpdatedAt: null,
+  deckPlayabilityRaw: null,
   lastPlayed: new Date("2015-01-15T00:00:00Z"),
   dateAdded: null,
   lastSyncedAt: null,
@@ -118,5 +126,55 @@ describe("DashboardGameCard", () => {
     expect(html).toContain('href="steam://install/227580"');
     expect(html).toContain('href="steam://run/227580"');
     expect(html).toContain("<button");
+  });
+
+  it("renders a Steam Deck badge while keeping detailed evidence collapsed", () => {
+    const deckGame: GameSummary = {
+      ...game,
+      steamDeckCompatibilityCategory: "verified",
+      steamDeckCompatibilityItems: [
+        {
+          status: "pass",
+          label: "Default controller config works",
+          locToken: "#SteamDeckVerified_TestResult_DefaultControllerConfigFullyFunctional",
+          rawDisplayType: 4,
+        },
+      ],
+      protondbTier: "platinum",
+      protondbConfidence: "strong",
+      protondbScore: 0.91,
+      protondbReportCount: 42,
+      deckPlayabilityUpdatedAt: new Date("2026-06-27T00:00:00Z"),
+      deckPlayabilityRaw: { steam: { resolved_category: 3 }, protondb: { tier: "platinum" } },
+    };
+
+    const html = renderToStaticMarkup(createElement(DashboardGameCard, { game: deckGame }));
+
+    expect(html).toContain('data-dashboard-deck-badge="playability"');
+    expect(html).toContain("Deck Verified");
+    expect(html).toContain('data-dashboard-deck-details="playability"');
+    expect(html).toContain("Show Steam Deck details");
+    expect(html).toContain("Deck experience");
+    expect(html).not.toContain('data-dashboard-deck-metrics="playability"');
+    expect(html).not.toContain("Excellent Deck fit");
+    expect(html).not.toContain("Default controller config works");
+  });
+
+  it("falls back to a ProtonDB badge when only community Deck data exists", () => {
+    const html = renderToStaticMarkup(
+      createElement(DashboardGameCard, {
+        game: {
+          ...game,
+          protondbTier: "gold",
+          protondbConfidence: "strong",
+          protondbScore: 0.78,
+          protondbReportCount: 20,
+        },
+      }),
+    );
+
+    expect(html).toContain("Deck Gold");
+    expect(html).toContain("Deck experience");
+    expect(html).not.toContain('data-dashboard-deck-metrics="playability"');
   });
 });

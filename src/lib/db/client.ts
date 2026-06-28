@@ -70,7 +70,7 @@ async function ensureRuntimeSchema(database: PostgresJsDatabase<typeof schema>) 
 
 async function runRuntimeSchemaBootstrap(database: PostgresJsDatabase<typeof schema>) {
   await database.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('video_game_play_tracker_schema_0003')::bigint)`);
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('video_game_play_tracker_schema_0004')::bigint)`);
     await tx.execute(sql.raw("alter type game_status add value if not exists 'done_for_now'"));
     await tx.execute(sql.raw(`
       alter table app_settings
@@ -150,7 +150,15 @@ async function runRuntimeSchemaBootstrap(database: PostgresJsDatabase<typeof sch
         add column if not exists rotation_skip_until timestamptz,
         add column if not exists rotation_last_skipped_at timestamptz,
         add column if not exists parked_for_later boolean not null default false,
-        add column if not exists reassess_after timestamptz
+        add column if not exists reassess_after timestamptz,
+        add column if not exists steam_deck_compatibility_category text,
+        add column if not exists steam_deck_compatibility_items jsonb,
+        add column if not exists protondb_tier text,
+        add column if not exists protondb_confidence text,
+        add column if not exists protondb_score double precision,
+        add column if not exists protondb_report_count integer,
+        add column if not exists deck_playability_updated_at timestamptz,
+        add column if not exists deck_playability_raw jsonb
     `));
     await tx.execute(sql.raw(`
       do $$
@@ -162,6 +170,28 @@ async function runRuntimeSchemaBootstrap(database: PostgresJsDatabase<typeof sch
         ) then
           alter table games
             add constraint games_rotation_skip_count_nonnegative check (rotation_skip_count >= 0);
+        end if;
+
+        if not exists (
+          select 1 from pg_constraint
+          where conrelid = 'games'::regclass
+            and conname = 'games_protondb_report_count_nonnegative'
+        ) then
+          alter table games
+            add constraint games_protondb_report_count_nonnegative check (
+              protondb_report_count is null or protondb_report_count >= 0
+            );
+        end if;
+
+        if not exists (
+          select 1 from pg_constraint
+          where conrelid = 'games'::regclass
+            and conname = 'games_protondb_score_range'
+        ) then
+          alter table games
+            add constraint games_protondb_score_range check (
+              protondb_score is null or (protondb_score >= 0 and protondb_score <= 1)
+            );
         end if;
       end
       $$

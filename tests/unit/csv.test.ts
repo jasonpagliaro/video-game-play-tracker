@@ -16,9 +16,12 @@ describe("Steam CSV parsing", () => {
     expect(preview.mapping.title).toBe("game");
     expect(preview.mapping.steamAppId).toBe("id");
     expect(preview.mapping.playtimeHours).toBe("hours");
+    expect(preview.mapping.steamDeckCompatibilityCategory).toBe("steam_deck");
     expect(preview.rows[0]?.normalized?.title).toBe("10,000,000");
     expect(preview.rows[0]?.normalized?.steamAppId).toBe(227580);
     expect(preview.rows[0]?.normalized?.playtimeMinutes).toBe(10);
+    expect(preview.rows[0]?.normalized?.steamDeckCompatibilityCategory).toBe("playable");
+    expect(preview.rows[0]?.normalized?.steamReviewSummary).toBeNull();
     expect(preview.rows[0]?.normalized?.releaseYear).toBe(2013);
   });
 

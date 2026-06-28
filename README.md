@@ -2,7 +2,7 @@
 
 A personal Steam backlog execution tool built with Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui, Supabase Auth, Supabase Postgres, and Drizzle.
 
-Phase 1 includes Steam library sync, scheduled Steam refresh, CSV import, backlog views, status transitions, active rotation limits, replacement workflow, queue ranking, category-aware queue insertion, settings, and core tests. Store metadata enrichment, achievements sync, check-ins, milestones, drag-and-drop queue, and AI recommendations are intentionally deferred to later phases.
+Phase 1 includes Steam library sync, scheduled Steam refresh, CSV import, backlog views, status transitions, active rotation limits, replacement workflow, queue ranking, category-aware queue insertion, settings, and core tests. Achievements sync, check-ins, milestones, drag-and-drop queue, and AI recommendations are intentionally deferred to later phases.
 
 ## Setup
 
@@ -89,6 +89,7 @@ The importer supports flexible column names and maps the discovered Steam export
 - `last_played`
 - `release_date` -> release year
 - review score columns into Steam review metadata
+- `steam_deck` -> Steam Deck compatibility category
 
 Imports upsert by Steam app id when present, otherwise normalized title. Manual status, notes, DNF decisions, queue position, and manually edited category/finish-style decisions are preserved on update.
 
@@ -96,7 +97,7 @@ Imports upsert by Steam app id when present, otherwise normalized title. Manual 
 
 The Steam sync accepts a SteamID64, `steamcommunity.com/profiles/:id` URL, `steamcommunity.com/id/:vanity` URL, SteamID2, SteamID3, or raw vanity name. It uses `STEAM_API_KEY` server-side to resolve vanity profiles, read the player summary, and pull owned games.
 
-This sync imports library-level data plus best-effort Steam Store metadata: app id, title, total and platform playtime, last played, owner SteamID64, Store genres/categories, release year, review score, and sync timestamps. Store metadata failures do not block library sync, and the app does not use AI.
+This sync imports library-level data plus best-effort Steam Store metadata: app id, title, total and platform playtime, last played, owner SteamID64, Store genres/categories, release year, review score, Steam Deck compatibility category/criteria, ProtonDB community tier/confidence/report count, and sync timestamps. Store metadata and Deck playability failures do not block library sync, and the app does not use AI.
 
 Steam libraries must be visible to the API. Empty/private-library results are safe: applying one will not mark existing owned games as missing from the latest sync.
 

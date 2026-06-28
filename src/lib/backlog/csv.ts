@@ -10,6 +10,7 @@ import {
   toMinutesFromHours,
 } from "./normalize";
 import type { CsvMapping, CsvPreview, CsvPreviewRow, ParsedCsvGame } from "./types";
+import { normalizeSteamDeckCompatibilityCategory } from "@/lib/steam/deck-playability";
 
 const columnAliases: Record<string, string[]> = {
   title: ["title", "game", "name"],
@@ -18,7 +19,8 @@ const columnAliases: Record<string, string[]> = {
   playtimeHours: ["playtime", "playtime forever", "hours played", "hours"],
   lastPlayed: ["last played", "last_played"],
   steamReviewScore: ["review score", "metascore", "userscore", "wilsonscore", "sdbrating"],
-  steamReviewSummary: ["review summary", "steam_deck"],
+  steamReviewSummary: ["review summary"],
+  steamDeckCompatibilityCategory: ["steam deck", "steam_deck", "deck compatibility", "steam deck compatibility"],
   tags: ["tags", "tag"],
   genres: ["genres", "genre"],
   achievements: ["achievements"],
@@ -94,6 +96,8 @@ export function parseCsvRow(
   const genres = splitList(getValue(row, mapping, "genres"));
   const reviewScore = parseOptionalNumber(getValue(row, mapping, "steamReviewScore"));
   const steamReviewSummary = String(getValue(row, mapping, "steamReviewSummary") ?? "").trim() || null;
+  const rawDeckCompatibility = getValue(row, mapping, "steamDeckCompatibilityCategory");
+  const steamDeckCompatibilityCategory = normalizeSteamDeckCompatibilityCategory(rawDeckCompatibility);
   const achievements = parseAchievements(getValue(row, mapping, "achievements"));
   const achievementPercent =
     parseOptionalNumber(getValue(row, mapping, "achievementPercent")) ?? achievements.achievementPercent;
@@ -118,6 +122,17 @@ export function parseCsvRow(
       releaseYear,
       genres,
       tags,
+      steamDeckCompatibilityCategory,
+      steamDeckCompatibilityItems: null,
+      protondbTier: null,
+      protondbConfidence: null,
+      protondbScore: null,
+      protondbReportCount: null,
+      deckPlayabilityUpdatedAt: steamDeckCompatibilityCategory ? new Date() : null,
+      deckPlayabilityRaw:
+        rawDeckCompatibility == null || String(rawDeckCompatibility).trim() === ""
+          ? null
+          : { csv: { steam_deck: String(rawDeckCompatibility).trim() } },
       achievementsUnlocked: achievements.achievementsUnlocked,
       achievementsTotal: achievements.achievementsTotal,
       achievementPercent,
@@ -179,4 +194,3 @@ export function parseSteamCsv(csvText: string, filename = "library.csv", sampleL
 export function normalizeImportTitle(title: string) {
   return normalizeTitle(title);
 }
-

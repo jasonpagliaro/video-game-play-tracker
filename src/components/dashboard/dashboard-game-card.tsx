@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowUpRight, ChevronDown, Download, ExternalLink, Play } from "lucide-react";
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
+import { DashboardDeckPlayabilityDetails, DeckPlayabilityBadge } from "@/components/dashboard/deck-playability";
 import { GameIdentityBanner } from "@/components/dashboard/game-identity-banner";
 import { DashboardPlaytimeDetails } from "@/components/dashboard/playtime-details";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,7 @@ export function DashboardGameCard({
             </div>
           </div>
           <DashboardPlaytimeDetails game={game} metricsClassName="text-[11px]" />
+          <DashboardDeckPlayabilityDetails game={game} metricsClassName="text-[11px]" />
           {steamInstallUrl && steamLaunchUrl ? (
             <div data-dashboard-actions="active" className="grid grid-cols-2 gap-1.5">
               <Button asChild size="sm" variant="outline" className="min-w-0 px-2 text-xs">
@@ -148,6 +150,7 @@ export function DashboardGameCard({
 
           <div className="grid gap-3">
             <DashboardPlaytimeDetails game={game} />
+            <DashboardDeckPlayabilityDetails game={game} />
 
             <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span className="truncate font-mono">{getSteamIdentityLabel(game.steamAppId)}</span>
@@ -181,7 +184,19 @@ function DashboardBadgeStrip({
   game,
   layout = "default",
 }: {
-  game: Pick<GameSummary, "status" | "backlogSlot" | "completionType">;
+  game: Pick<
+    GameSummary,
+    | "status"
+    | "backlogSlot"
+    | "completionType"
+    | "steamDeckCompatibilityCategory"
+    | "steamDeckCompatibilityItems"
+    | "protondbTier"
+    | "protondbConfidence"
+    | "protondbScore"
+    | "protondbReportCount"
+    | "deckPlayabilityUpdatedAt"
+  >;
   layout?: "default" | "active";
 }) {
   if (layout === "active") {
@@ -191,8 +206,9 @@ function DashboardBadgeStrip({
           <StatusBadge status={game.status} />
           <CompletionTypeBadge completionType={game.completionType} />
         </div>
-        <div data-dashboard-badge-row="slot" className="flex min-w-0 overflow-hidden">
+        <div data-dashboard-badge-row="slot" className="flex min-w-0 gap-1.5 overflow-hidden">
           <SlotBadge slot={game.backlogSlot} />
+          <DeckPlayabilityBadge game={game} />
         </div>
       </div>
     );
@@ -203,6 +219,7 @@ function DashboardBadgeStrip({
       <StatusBadge status={game.status} />
       <SlotBadge slot={game.backlogSlot} />
       <CompletionTypeBadge completionType={game.completionType} />
+      <DeckPlayabilityBadge game={game} />
     </div>
   );
 }
