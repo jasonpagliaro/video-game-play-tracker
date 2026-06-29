@@ -160,7 +160,8 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Steam Deck Verified");
     expect(html.indexOf("Steam Deck Verified")).toBeLessThan(html.indexOf("Short / Palate Cleanser"));
     expect(html).toContain("Steam Deck compatibility");
-    expect(html).toContain('aria-label="Open Steam Deck compatibility details for 10,000,000"');
+    expect(html).toContain("line-clamp-3");
+    expect(html).not.toContain("Open Steam Deck compatibility details");
     expect(html).not.toContain("Extra");
     expect(html).toContain("Excellent Deck fit");
     expect(html).toContain("Steam Deck: Verified");
