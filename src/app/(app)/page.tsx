@@ -143,7 +143,7 @@ function OpenSlotCard({
                 <span className="line-clamp-2">{candidate.title}</span>
               </Link>
               <DeckPlayabilitySummary game={candidate} className="mt-2 text-center sm:text-left" />
-              <DashboardPlaytimeSummary game={candidate} className="mt-2 justify-center sm:justify-start" />
+              <DashboardPlaytimeSummary game={candidate} className="mt-2 sm:grid-cols-3" />
             </div>
             <form action={addRotationSuggestionToRotationAction}>
               <input type="hidden" name="gameId" value={candidate.id} />

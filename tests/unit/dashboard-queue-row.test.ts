@@ -92,10 +92,10 @@ describe("DashboardQueueRow", () => {
 
     expect(html).toContain('data-dashboard-deck-badge="playability"');
     expect(html).toContain('data-dashboard-deck-summary="playability"');
-    expect(html).toContain("Deck Playable");
+    expect(html).toContain("Steam Deck Playable");
     expect(html).toContain("Good with minor caveats");
-    expect(html).toContain("Steam Playable");
-    expect(html).toContain("ProtonDB Gold");
+    expect(html).toContain("Steam Deck: Playable");
+    expect(html).toContain("ProtonDB: Gold");
     expect(html).toContain("78%");
     expect(html).toContain("20 reports");
     expect(html).not.toContain("Deck experience");

@@ -27,7 +27,7 @@ export function DeckPlayabilityBadge({ game }: { game: DeckPlayabilityGame }) {
   const category = game.steamDeckCompatibilityCategory;
   const officialCategory = category && category !== "unknown" ? category : null;
   const label = officialCategory
-    ? `Deck ${getSteamDeckCompatibilityCategoryLabel(officialCategory)}`
+    ? `Steam Deck ${getSteamDeckCompatibilityCategoryLabel(officialCategory)}`
     : game.protondbTier
       ? `ProtonDB ${getProtonDbTierLabel(game.protondbTier)}`
       : "ProtonDB";
@@ -45,7 +45,15 @@ export function DeckPlayabilityBadge({ game }: { game: DeckPlayabilityGame }) {
   );
 }
 
-export function DeckPlayabilitySummary({ game, className }: { game: DeckPlayabilityGame; className?: string }) {
+export function DeckPlayabilitySummary({
+  game,
+  className,
+  showLabel = false,
+}: {
+  game: DeckPlayabilityGame;
+  className?: string;
+  showLabel?: boolean;
+}) {
   if (!hasDeckPlayabilityData(game)) return null;
 
   const parts = [getDeckExperienceLabel(game), getOfficialSteamDeckSummary(game), getProtonDbSummary(game)].filter(
@@ -54,8 +62,11 @@ export function DeckPlayabilitySummary({ game, className }: { game: DeckPlayabil
   if (!parts.length) return null;
 
   return (
-    <div data-dashboard-deck-summary="playability" className={cn("min-w-0 text-xs text-muted-foreground", className)}>
-      <span className="line-clamp-2">{parts.join(" · ")}</span>
+    <div data-dashboard-deck-summary="playability" className={cn("grid min-w-0 gap-1 text-xs", className)}>
+      {showLabel ? (
+        <span className="text-[10px] font-medium text-muted-foreground">Extra: Steam Deck compatibility</span>
+      ) : null}
+      <span className="line-clamp-2 text-muted-foreground">{parts.join(" · ")}</span>
     </div>
   );
 }
@@ -63,16 +74,17 @@ export function DeckPlayabilitySummary({ game, className }: { game: DeckPlayabil
 function getOfficialSteamDeckSummary(game: DeckPlayabilityGame) {
   const category = game.steamDeckCompatibilityCategory;
   if (!category || category === "unknown") return null;
-  return `Steam ${getSteamDeckCompatibilityCategoryLabel(category)}`;
+  return `Steam Deck: ${getSteamDeckCompatibilityCategoryLabel(category)}`;
 }
 
 function getProtonDbSummary(game: DeckPlayabilityGame) {
   if (!game.protondbTier && game.protondbScore == null && game.protondbReportCount == null) return null;
 
-  const parts = [game.protondbTier ? `ProtonDB ${getProtonDbTierLabel(game.protondbTier)}` : "ProtonDB"];
+  const parts: string[] = [];
+  if (game.protondbTier) parts.push(getProtonDbTierLabel(game.protondbTier));
   const score = formatProtonDbScore(game.protondbScore);
   if (score !== "-") parts.push(score);
   const reports = formatProtonDbReportCount(game.protondbReportCount);
   if (reports !== "-") parts.push(reports);
-  return parts.join(" · ");
+  return `ProtonDB: ${parts.join(", ")}`;
 }

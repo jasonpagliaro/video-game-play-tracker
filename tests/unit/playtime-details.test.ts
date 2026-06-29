@@ -63,4 +63,19 @@ describe("DashboardPlaytimeSummary", () => {
     expect(html).toContain("Ongoing");
     expect(html).not.toContain("Progress");
   });
+
+  it("uses clear remaining copy after the estimate is met", () => {
+    const html = renderToStaticMarkup(
+      createElement(DashboardPlaytimeSummary, {
+        game: { ...baseGame, playtimeMinutes: 150 },
+      }),
+    );
+
+    expect(html).toContain("Progress");
+    expect(html).toContain("100%+");
+    expect(html).not.toContain("125%");
+    expect(html).toContain("Remaining");
+    expect(html).toContain("Estimate met");
+    expect(html).not.toContain("At / over");
+  });
 });
