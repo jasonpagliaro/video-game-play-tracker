@@ -59,7 +59,7 @@ export function DashboardGameCard({
           <DeckPlayabilitySummary
             game={game}
             showLabel
-            className="border-t border-border/60 pt-2 text-muted-foreground"
+            className="text-muted-foreground"
           />
           <DashboardPlaytimeSummary game={game} className="text-[11px]" />
           <DashboardActiveActions
@@ -97,7 +97,7 @@ export function DashboardGameCard({
           <DeckPlayabilitySummary
             game={game}
             showLabel
-            className="border-t border-border/60 pt-2 text-muted-foreground"
+            className="text-muted-foreground"
           />
           <DashboardPlaytimeSummary game={game} />
         </CardContent>
@@ -124,7 +124,7 @@ export function DashboardGameCard({
           <DeckPlayabilitySummary
             game={game}
             showLabel
-            className="border-t border-border/60 pt-2 text-muted-foreground"
+            className="text-muted-foreground"
           />
           <DashboardPlaytimeSummary game={game} />
         </div>

@@ -62,9 +62,16 @@ export function DeckPlayabilitySummary({
   if (!parts.length) return null;
 
   return (
-    <div data-dashboard-deck-summary="playability" className={cn("grid min-w-0 gap-1 text-xs", className)}>
+    <div
+      data-dashboard-deck-summary="playability"
+      className={cn(
+        "grid min-w-0 gap-1 text-xs",
+        showLabel && "rounded-md border border-border/60 bg-muted/10 px-2 py-2",
+        className,
+      )}
+    >
       {showLabel ? (
-        <span className="text-[10px] font-medium text-muted-foreground">Extra: Steam Deck compatibility</span>
+        <span className="text-[10px] font-medium text-muted-foreground">Steam Deck compatibility</span>
       ) : null}
       <span className="line-clamp-2 text-muted-foreground">{parts.join(" · ")}</span>
     </div>
