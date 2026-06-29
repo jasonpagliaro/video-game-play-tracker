@@ -160,12 +160,15 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Steam Deck Verified");
     expect(html.indexOf("Steam Deck Verified")).toBeLessThan(html.indexOf("Short / Palate Cleanser"));
     expect(html).toContain("Steam Deck compatibility");
-    expect(html).toContain("line-clamp-3");
+    expect(html).toContain("Fit");
+    expect(html).toContain("Steam");
+    expect(html).toContain("ProtonDB");
+    expect(html).toContain("grid-cols-[3.625rem_minmax(0,1fr)]");
     expect(html).not.toContain("Open Steam Deck compatibility details");
     expect(html).not.toContain("Extra");
     expect(html).toContain("Excellent Deck fit");
-    expect(html).toContain("Steam Deck: Verified");
-    expect(html).toContain("ProtonDB: Platinum");
+    expect(html).toContain("Verified");
+    expect(html).toContain("Platinum");
     expect(html).toContain("91%");
     expect(html).toContain("42 reports");
     expect(html).not.toContain('data-dashboard-deck-details="playability"');
@@ -189,7 +192,8 @@ describe("DashboardGameCard", () => {
 
     expect(html).toContain("ProtonDB Gold");
     expect(html).toContain("Community reports are strong");
-    expect(html).toContain("ProtonDB: Gold");
+    expect(html).toContain("ProtonDB");
+    expect(html).toContain("Gold");
     expect(html).toContain("78%");
     expect(html).toContain("20 reports");
     expect(html).not.toContain("Deck experience");
