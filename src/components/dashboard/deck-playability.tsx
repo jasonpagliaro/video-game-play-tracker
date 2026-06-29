@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { DeckPlayabilityDialog } from "@/components/dashboard/deck-playability-dialog";
 import type { GameSummary } from "@/lib/backlog/types";
 import {
   formatProtonDbReportCount,
@@ -10,7 +11,7 @@ import {
 } from "@/lib/steam/deck-playability";
 import { cn } from "@/lib/utils";
 
-type DeckPlayabilityGame = Pick<
+type DeckPlayabilityData = Pick<
   GameSummary,
   | "steamDeckCompatibilityCategory"
   | "steamDeckCompatibilityItems"
@@ -21,7 +22,9 @@ type DeckPlayabilityGame = Pick<
   | "deckPlayabilityUpdatedAt"
 >;
 
-export function DeckPlayabilityBadge({ game }: { game: DeckPlayabilityGame }) {
+type DeckPlayabilityGame = DeckPlayabilityData & Pick<GameSummary, "title">;
+
+export function DeckPlayabilityBadge({ game }: { game: DeckPlayabilityData }) {
   if (!hasDeckPlayabilityData(game)) return null;
 
   const category = game.steamDeckCompatibilityCategory;
@@ -57,22 +60,19 @@ export function DeckPlayabilitySummary({
   if (!hasDeckPlayabilityData(game)) return null;
 
   const parts = [getDeckExperienceLabel(game), getOfficialSteamDeckSummary(game), getProtonDbSummary(game)].filter(
-    Boolean,
+    (part): part is string => Boolean(part),
   );
   if (!parts.length) return null;
+
+  if (showLabel) {
+    return <DeckPlayabilityDialog title={game.title} summaryParts={parts} className={className} />;
+  }
 
   return (
     <div
       data-dashboard-deck-summary="playability"
-      className={cn(
-        "grid min-w-0 gap-1 text-xs",
-        showLabel && "rounded-md border border-border/60 bg-muted/10 px-2 py-2",
-        className,
-      )}
+      className={cn("grid min-w-0 gap-1 text-xs", className)}
     >
-      {showLabel ? (
-        <span className="text-[10px] font-medium text-muted-foreground">Steam Deck compatibility</span>
-      ) : null}
       <span className="line-clamp-2 text-muted-foreground">{parts.join(" · ")}</span>
     </div>
   );
