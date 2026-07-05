@@ -4,6 +4,7 @@ import { ArrowRight, Plus } from "lucide-react";
 
 import { DashboardActiveHealth } from "@/components/dashboard/dashboard-active-health";
 import { DeckPlayabilityBadge, DeckPlayabilitySummary } from "@/components/dashboard/deck-playability";
+import { DashboardGameSearch } from "@/components/dashboard/dashboard-game-search";
 import { DashboardGameCard } from "@/components/dashboard/dashboard-game-card";
 import { DashboardOverviewStrip } from "@/components/dashboard/dashboard-overview-strip";
 import { DashboardQueueStatus } from "@/components/dashboard/dashboard-queue-status";
@@ -29,6 +30,16 @@ export default async function DashboardPage() {
     limit: summary.active.openSlots,
   });
   const queuePositions = new Map(summary.queuedGames.map((game, index) => [game.id, index + 1]));
+  const searchGames = games.map((game) => ({
+    id: game.id,
+    title: game.title,
+    steamAppId: game.steamAppId,
+    status: game.status,
+    backlogSlot: game.backlogSlot,
+    completionType: game.completionType,
+    currentRotation: game.currentRotation,
+    queuePosition: queuePositions.get(game.id) ?? null,
+  }));
 
   return (
     <div className="grid gap-3 p-3 lg:p-4 xl:p-5">
@@ -47,6 +58,7 @@ export default async function DashboardPage() {
             </Link>
           </Button>
         </header>
+        <DashboardGameSearch games={searchGames} />
         <DashboardOverviewStrip summary={summary} settings={settings} />
         <DashboardSection
           title="Current active rotation"
