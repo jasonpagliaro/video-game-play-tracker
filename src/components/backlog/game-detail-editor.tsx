@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ListPlus, Minus, Plus } from "lucide-react";
+import { ChevronsUp, ListPlus, Minus, Plus } from "lucide-react";
 
 import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
 import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
@@ -242,6 +242,7 @@ function QueueMembershipControl({ game }: { game: Game }) {
               Return to queue
             </Button>
           </form>
+          <ForceNextQueueButton game={game} />
         </div>
       </div>
     );
@@ -249,7 +250,7 @@ function QueueMembershipControl({ game }: { game: Game }) {
   return (
     <div className="grid gap-2">
       <Label>Queue</Label>
-      <div className="flex min-h-9 items-center gap-2">
+      <div className="flex min-h-9 flex-wrap items-center gap-2">
         {queued ? (
           <>
             <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Queued</span>
@@ -261,19 +262,43 @@ function QueueMembershipControl({ game }: { game: Game }) {
                 Remove
               </Button>
             </form>
+            <ForceNextQueueButton game={game} />
           </>
         ) : (
-          <form action={queueCommandAction}>
-            <input type="hidden" name="gameId" value={game.id} />
-            <input type="hidden" name="command" value="add_to_queue" />
-            <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
-              <Plus className="h-3.5 w-3.5" />
-              Add to queue
-            </Button>
-          </form>
+          <>
+            <form action={queueCommandAction}>
+              <input type="hidden" name="gameId" value={game.id} />
+              <input type="hidden" name="command" value="add_to_queue" />
+              <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
+                <Plus className="h-3.5 w-3.5" />
+                Add to queue
+              </Button>
+            </form>
+            <ForceNextQueueButton game={game} />
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+function ForceNextQueueButton({ game, disabled = false }: { game: Game; disabled?: boolean }) {
+  return (
+    <form action={queueCommandAction}>
+      <input type="hidden" name="gameId" value={game.id} />
+      <input type="hidden" name="command" value="force_next_in_queue" />
+      <Button
+        type="submit"
+        size="sm"
+        variant="secondary"
+        className="h-8 gap-1"
+        title="Force up next"
+        disabled={disabled || !canForceNextInQueue(game)}
+      >
+        <ChevronsUp className="h-3.5 w-3.5" />
+        Up next
+      </Button>
+    </form>
   );
 }
 
@@ -289,4 +314,8 @@ function canAddToQueue(game: Game) {
     game.status !== "parked" &&
     game.status !== "wont_complete"
   );
+}
+
+function canForceNextInQueue(game: Game) {
+  return !game.currentRotation;
 }

@@ -4,6 +4,7 @@ import {
   calculateCategoryDistribution,
   filterQueueEligibleCandidates,
   findQueueSlotCluster,
+  forceNextInQueue,
   insertGamesWithCategoryBalance,
   rankQueueSequentially,
   rebalanceQueue,
@@ -174,6 +175,41 @@ describe("queue balancing", () => {
         targetGameId: "c",
       }).map((item) => item.id),
     ).toEqual(["b", "c", "a", "d"]);
+  });
+
+  it("forces an unqueued game to the next queue slot and shifts locked games down", () => {
+    const queue = [
+      game("locked", "horror", 50, { queueLocked: true, queueRank: 1000 }),
+      game("a", "action", 50, { queueRank: 2000 }),
+      game("b", "puzzle", 50, { queueRank: 3000 }),
+    ];
+    const ranked = forceNextInQueue(queue, game("manual", "strategy"));
+
+    expect(ranked.map((item) => [item.id, item.queueRank, item.queueLocked])).toEqual([
+      ["manual", 1000, false],
+      ["locked", 2000, true],
+      ["a", 3000, false],
+      ["b", 4000, false],
+    ]);
+  });
+
+  it("keeps forced up-next ordering even when category repair would prefer a later slot", () => {
+    const queue = [
+      game("action-1", "action", 50, { queueRank: 1000 }),
+      game("action-2", "action", 50, { queueRank: 2000 }),
+      game("action-3", "action", 50, { queueRank: 3000 }),
+      game("puzzle-1", "puzzle", 50, { queueRank: 4000 }),
+    ];
+    const ranked = forceNextInQueue(queue, game("manual-action", "action"));
+
+    expect(ranked.map((item) => item.id)).toEqual([
+      "manual-action",
+      "action-1",
+      "action-2",
+      "action-3",
+      "puzzle-1",
+    ]);
+    expect(findQueueSlotCluster(ranked)).toMatchObject({ slot: "action", count: 4 });
   });
 
   it("recomputes stable internal ranks while preserving locked positions", () => {

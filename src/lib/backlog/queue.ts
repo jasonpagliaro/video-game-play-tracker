@@ -31,6 +31,7 @@ export const QUEUE_COMMANDS = [
   "move_before",
   "move_after",
   "add_to_queue",
+  "force_next_in_queue",
   "remove_from_queue",
 ] as const;
 
@@ -46,7 +47,7 @@ export const QUEUE_SORT_PRESETS = [
 export type QueueCommand = (typeof QUEUE_COMMANDS)[number];
 export type QueueSortPreset = (typeof QUEUE_SORT_PRESETS)[number];
 
-type QueueMoveCommand = Exclude<QueueCommand, "add_to_queue" | "remove_from_queue">;
+type QueueMoveCommand = Exclude<QueueCommand, "add_to_queue" | "force_next_in_queue" | "remove_from_queue">;
 
 type Distribution = {
   slots: Record<string, number>;
@@ -228,6 +229,21 @@ export function rankQueueSequentially(
   }
 
   return ranked.sort((a, b) => (a.queueRank ?? Number.MAX_SAFE_INTEGER) - (b.queueRank ?? Number.MAX_SAFE_INTEGER));
+}
+
+export function forceNextInQueue(
+  queue: QueueCandidate[],
+  target: QueueCandidate,
+  options: { rankStep?: number } = {},
+) {
+  const rankStep = options.rankStep ?? QUEUE_RULES.rankStep;
+  const targetQueued = { ...target, queueRank: rankStep };
+  const rest = normalizeQueued(queue).filter((game) => game.id !== target.id);
+
+  return [targetQueued, ...rest].map((game, index) => ({
+    ...game,
+    queueRank: (index + 1) * rankStep,
+  }));
 }
 
 export function repairQueueSlotClusters(

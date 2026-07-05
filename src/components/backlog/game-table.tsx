@@ -666,22 +666,27 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
   if (game.queueRank == null) {
     const eligible = canAddToQueue(game);
     return (
-      <form action={queueCommandAction} className="min-w-32">
-        <input type="hidden" name="gameId" value={game.id} />
-        <input type="hidden" name="command" value="add_to_queue" />
-        <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
-          <Plus className="h-3.5 w-3.5" />
-          Queue
-        </Button>
-      </form>
+      <div className="flex min-w-40 flex-wrap items-center gap-1">
+        <form action={queueCommandAction}>
+          <input type="hidden" name="gameId" value={game.id} />
+          <input type="hidden" name="command" value="add_to_queue" />
+          <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
+            <Plus className="h-3.5 w-3.5" />
+            Queue
+          </Button>
+        </form>
+        <ForceNextQueueButton game={game} label="Up next" />
+      </div>
     );
   }
 
+  const forceAlreadyApplied = position === 1 && !hasForceNextQueueGate(game);
   return (
-    <div className="flex min-w-32 items-center gap-2">
+    <div className="flex min-w-40 items-center gap-1">
       <span className="rounded-md border border-border px-2 py-1 font-mono text-xs">
         {position === 1 ? "Next" : position ? `#${position}` : "Queued"}
       </span>
+      <ForceNextQueueButton game={game} disabled={forceAlreadyApplied} />
       <form action={queueCommandAction}>
         <input type="hidden" name="gameId" value={game.id} />
         <input type="hidden" name="command" value="remove_from_queue" />
@@ -690,6 +695,35 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
         </Button>
       </form>
     </div>
+  );
+}
+
+function ForceNextQueueButton({
+  game,
+  label,
+  disabled,
+}: {
+  game: GameSummary;
+  label?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <form action={queueCommandAction}>
+      <input type="hidden" name="gameId" value={game.id} />
+      <input type="hidden" name="command" value="force_next_in_queue" />
+      <Button
+        type="submit"
+        size={label ? "sm" : "icon"}
+        variant="secondary"
+        className="h-8 gap-1"
+        title="Force up next"
+        aria-label="Force up next"
+        disabled={disabled || !canForceNextInQueue(game)}
+      >
+        <ChevronsUp className="h-3.5 w-3.5" />
+        {label}
+      </Button>
+    </form>
   );
 }
 
@@ -866,6 +900,23 @@ function canAddToQueue(game: GameSummary) {
     game.status !== "dnf" &&
     game.status !== "parked" &&
     game.status !== "wont_complete"
+  );
+}
+
+function canForceNextInQueue(game: GameSummary) {
+  return !game.currentRotation;
+}
+
+function hasForceNextQueueGate(game: GameSummary) {
+  return (
+    game.parkedForLater ||
+    game.rotationSkipUntil != null ||
+    game.syncState === "ignored" ||
+    game.status === "completed" ||
+    game.status === "done_for_now" ||
+    game.status === "dnf" ||
+    game.status === "parked" ||
+    game.status === "wont_complete"
   );
 }
 

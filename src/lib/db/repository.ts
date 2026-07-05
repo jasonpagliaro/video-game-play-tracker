@@ -25,6 +25,7 @@ import {
 } from "@/lib/backlog/constants";
 import {
   filterQueueEligibleCandidates,
+  forceNextInQueue,
   insertGamesWithCategoryBalance,
   QUEUE_RULES,
   reorderQueueByCommand,
@@ -67,7 +68,14 @@ type Tx = Parameters<Parameters<ReturnType<typeof import("./client").getDb>["tra
 
 export type ImportDecision = "unqueued" | "queue" | "park" | "wont_complete" | "review";
 
-type QueueMoveCommand = Exclude<QueueCommand, "add_to_queue" | "remove_from_queue">;
+type QueueMoveCommand = Exclude<QueueCommand, "add_to_queue" | "force_next_in_queue" | "remove_from_queue">;
+const FORCE_NEXT_RESET_STATUSES = new Set<GameStatus>([
+  "completed",
+  "done_for_now",
+  "dnf",
+  "parked",
+  "wont_complete",
+]);
 
 export type ImportApplyResult = {
   batchId: string | null;
@@ -963,6 +971,36 @@ export async function applyQueueCommand(
       return;
     }
 
+    if (input.command === "force_next_in_queue") {
+      if (target.currentRotation) {
+        throw new Error("Remove this game from the active rotation before forcing it up next.");
+      }
+      const queueRows = await tx.query.games.findMany({
+        where: and(eq(games.userId, user.id), sql`${games.queueRank} is not null`),
+        orderBy: [asc(games.queueRank)],
+      });
+      const existingRanks = new Map(queueRows.map((game) => [game.id, game.queueRank]));
+      const queue = forceNextInQueue(queueRows.map(mapQueueCandidate), mapQueueCandidate(target));
+      const nextStatus = FORCE_NEXT_RESET_STATUSES.has(target.status) ? "not_started" : target.status;
+      await tx
+        .update(games)
+        .set({
+          status: nextStatus,
+          syncState: target.syncState === "ignored" ? "imported" : target.syncState,
+          currentRotation: false,
+          rotationSkipCount: 0,
+          rotationSkipUntil: null,
+          rotationLastSkippedAt: null,
+          parkedForLater: false,
+          reassessAfter: null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(games.userId, user.id), eq(games.id, input.gameId)));
+      await insertStatusHistoryIfChanged(tx, user.id, target, nextStatus, "Forced into Up Next queue");
+      await persistQueueRanks(tx, user.id, queue, existingRanks);
+      return;
+    }
+
     if (target.queueRank == null) throw new Error("Only queued games can be moved.");
     if (target.queueLocked) throw new Error("Locked queue items cannot be moved.");
 
@@ -1286,10 +1324,9 @@ async function persistQueueRanks(
     throw new Error("Queue rebalance produced duplicate ranks.");
   }
 
-  const movable = rankedQueue.filter((item) => !item.queueLocked);
   const ranksToPersist = existingRanks
-    ? movable.filter((item) => existingRanks.get(item.id) !== item.queueRank)
-    : movable;
+    ? rankedQueue.filter((item) => existingRanks.get(item.id) !== item.queueRank)
+    : rankedQueue;
   if (ranksToPersist.length === 0) return;
 
   const now = new Date();
