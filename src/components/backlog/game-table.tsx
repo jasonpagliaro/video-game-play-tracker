@@ -47,6 +47,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -428,10 +429,10 @@ export function GameTable({
                 ))}
               </SelectContent>
             </Select>
-            <Button size="sm" variant="outline" className="gap-2">
+            <PendingSubmitButton size="sm" variant="outline" className="gap-2" pendingLabel="Sorting...">
               <ListOrdered className="h-4 w-4" />
               Sort queue
-            </Button>
+            </PendingSubmitButton>
           </form>
         ) : null}
       </div>
@@ -666,14 +667,20 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
   if (game.queueRank == null) {
     const eligible = canAddToQueue(game);
     return (
-      <div className="flex min-w-40 flex-wrap items-center gap-1">
+      <div className="flex min-w-40 flex-wrap items-center gap-1" aria-live="polite">
         <form action={queueCommandAction}>
           <input type="hidden" name="gameId" value={game.id} />
           <input type="hidden" name="command" value="add_to_queue" />
-          <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
+          <PendingSubmitButton
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1"
+            disabled={!eligible}
+            pendingLabel="Queuing..."
+          >
             <Plus className="h-3.5 w-3.5" />
             Queue
-          </Button>
+          </PendingSubmitButton>
         </form>
         <ForceNextQueueButton game={game} label="Up next" />
       </div>
@@ -682,7 +689,7 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
 
   const forceAlreadyApplied = position === 1 && !hasForceNextQueueGate(game);
   return (
-    <div className="flex min-w-40 items-center gap-1">
+    <div className="flex min-w-40 items-center gap-1" aria-live="polite">
       <span className="rounded-md border border-border px-2 py-1 font-mono text-xs">
         {position === 1 ? "Next" : position ? `#${position}` : "Queued"}
       </span>
@@ -690,9 +697,17 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
       <form action={queueCommandAction}>
         <input type="hidden" name="gameId" value={game.id} />
         <input type="hidden" name="command" value="remove_from_queue" />
-        <Button type="submit" size="icon" variant="ghost" className="h-8 w-8" title="Remove from queue">
+        <PendingSubmitButton
+          size="icon"
+          variant="ghost"
+          className="h-8 w-8"
+          title="Remove from queue"
+          aria-label="Remove from queue"
+          pendingLabel="Removing..."
+          pendingLabelVisible={false}
+        >
           <Minus className="h-4 w-4" />
-        </Button>
+        </PendingSubmitButton>
       </form>
     </div>
   );
@@ -711,18 +726,19 @@ function ForceNextQueueButton({
     <form action={queueCommandAction}>
       <input type="hidden" name="gameId" value={game.id} />
       <input type="hidden" name="command" value="force_next_in_queue" />
-      <Button
-        type="submit"
+      <PendingSubmitButton
         size={label ? "sm" : "icon"}
         variant="secondary"
         className="h-8 gap-1"
         title="Force up next"
         aria-label="Force up next"
         disabled={disabled || !canForceNextInQueue(game)}
+        pendingLabel="Moving..."
+        pendingLabelVisible={Boolean(label)}
       >
         <ChevronsUp className="h-3.5 w-3.5" />
         {label}
-      </Button>
+      </PendingSubmitButton>
     </form>
   );
 }
@@ -807,9 +823,18 @@ function QueueCommandButton({
     <form action={queueCommandAction}>
       <input type="hidden" name="gameId" value={gameId} />
       <input type="hidden" name="command" value={command} />
-      <Button type="submit" size="icon" variant="ghost" className="h-8 w-8" title={title} disabled={disabled}>
+      <PendingSubmitButton
+        size="icon"
+        variant="ghost"
+        className="h-8 w-8"
+        title={title}
+        aria-label={title}
+        disabled={disabled}
+        pendingLabel="Moving..."
+        pendingLabelVisible={false}
+      >
         {children}
-      </Button>
+      </PendingSubmitButton>
     </form>
   );
 }
@@ -878,9 +903,9 @@ function QueueMoveDialog({
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={!selectedTargetGameId}>
+              <PendingSubmitButton disabled={!selectedTargetGameId} pendingLabel="Moving...">
                 Move
-              </Button>
+              </PendingSubmitButton>
             </DialogFooter>
           </form>
         ) : null}

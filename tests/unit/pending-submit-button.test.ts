@@ -47,4 +47,18 @@ describe("PendingSubmitButton", () => {
     expect(html).not.toContain("Add to rotation");
     expect(html).toContain("animate-spin");
   });
+
+  it("keeps icon-only buttons compact while preserving accessible pending text", () => {
+    formStatus.pending = true;
+
+    const html = renderToStaticMarkup(
+      createElement(PendingSubmitButton, { pendingLabel: "Moving...", pendingLabelVisible: false }, "Move"),
+    );
+
+    expect(html).toContain("disabled");
+    expect(html).toContain('aria-busy="true"');
+    expect(html).toContain("Moving...");
+    expect(html).toContain('<span class="sr-only">Moving...</span>');
+    expect(html).not.toContain(">Move<");
+  });
 });

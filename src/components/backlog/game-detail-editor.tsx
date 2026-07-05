@@ -7,10 +7,10 @@ import { ChevronsUp, ListPlus, Minus, Plus } from "lucide-react";
 import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
 import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
 import { StatusResolutionDialog, type StatusResolutionIntent } from "@/components/backlog/status-resolution-dialog";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PendingSubmitButton } from "@/components/ui/pending-submit-button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -231,16 +231,21 @@ function QueueMembershipControl({ game }: { game: Game }) {
     return (
       <div className="grid gap-2">
         <Label>Queue</Label>
-        <div className="flex min-h-9 flex-wrap items-center gap-2">
+        <div className="flex min-h-9 flex-wrap items-center gap-2" aria-live="polite">
           <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
             Parked until {formatDate(game.reassessAfter)}
           </span>
           <form action={returnParkedGameToQueueAction}>
             <input type="hidden" name="gameId" value={game.id} />
-            <Button type="submit" size="sm" variant="outline" className="h-8 gap-1">
+            <PendingSubmitButton
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1"
+              pendingLabel="Returning..."
+            >
               <ListPlus className="h-3.5 w-3.5" />
               Return to queue
-            </Button>
+            </PendingSubmitButton>
           </form>
           <ForceNextQueueButton game={game} />
         </div>
@@ -250,17 +255,22 @@ function QueueMembershipControl({ game }: { game: Game }) {
   return (
     <div className="grid gap-2">
       <Label>Queue</Label>
-      <div className="flex min-h-9 flex-wrap items-center gap-2">
+      <div className="flex min-h-9 flex-wrap items-center gap-2" aria-live="polite">
         {queued ? (
           <>
             <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Queued</span>
             <form action={queueCommandAction}>
               <input type="hidden" name="gameId" value={game.id} />
               <input type="hidden" name="command" value="remove_from_queue" />
-              <Button type="submit" size="sm" variant="outline" className="h-8 gap-1">
+              <PendingSubmitButton
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1"
+                pendingLabel="Removing..."
+              >
                 <Minus className="h-3.5 w-3.5" />
                 Remove
-              </Button>
+              </PendingSubmitButton>
             </form>
             <ForceNextQueueButton game={game} />
           </>
@@ -269,10 +279,16 @@ function QueueMembershipControl({ game }: { game: Game }) {
             <form action={queueCommandAction}>
               <input type="hidden" name="gameId" value={game.id} />
               <input type="hidden" name="command" value="add_to_queue" />
-              <Button type="submit" size="sm" variant="outline" className="h-8 gap-1" disabled={!eligible}>
+              <PendingSubmitButton
+                size="sm"
+                variant="outline"
+                className="h-8 gap-1"
+                disabled={!eligible}
+                pendingLabel="Queuing..."
+              >
                 <Plus className="h-3.5 w-3.5" />
                 Add to queue
-              </Button>
+              </PendingSubmitButton>
             </form>
             <ForceNextQueueButton game={game} />
           </>
@@ -287,17 +303,17 @@ function ForceNextQueueButton({ game, disabled = false }: { game: Game; disabled
     <form action={queueCommandAction}>
       <input type="hidden" name="gameId" value={game.id} />
       <input type="hidden" name="command" value="force_next_in_queue" />
-      <Button
-        type="submit"
+      <PendingSubmitButton
         size="sm"
         variant="secondary"
         className="h-8 gap-1"
         title="Force up next"
         disabled={disabled || !canForceNextInQueue(game)}
+        pendingLabel="Moving..."
       >
         <ChevronsUp className="h-3.5 w-3.5" />
         Up next
-      </Button>
+      </PendingSubmitButton>
     </form>
   );
 }
