@@ -60,12 +60,10 @@ export function GameDetailEditor({
   const backlogSlot = useAutoSaveField<BacklogSlot, GameVisibilitySnapshot>({
     initialValue: game.backlogSlot,
     save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "backlogSlot", value }),
-    onSaved,
   });
   const completionType = useAutoSaveField<CompletionType, GameVisibilitySnapshot>({
     initialValue: game.completionType,
     save: (value) => autoSaveGameFieldAction({ gameId: game.id, field: "completionType", value }),
-    onSaved,
   });
   const personalInterest = useAutoSaveField<PersonalInterest, GameVisibilitySnapshot>({
     initialValue: game.personalInterest,

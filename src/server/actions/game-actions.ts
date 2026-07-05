@@ -110,10 +110,12 @@ export async function autoSaveGameFieldAction(
       });
     } else if (input.field === "backlogSlot") {
       if (!isBacklogSlot(String(input.value))) return { ok: false, message: "Invalid backlog slot." };
-      await updateGameFields(user, input.gameId, { backlogSlot: input.value });
+      const { rebalanced } = await updateGameFields(user, input.gameId, { backlogSlot: input.value });
+      revalidateFullApp = rebalanced;
     } else if (input.field === "completionType") {
       if (!isCompletionType(String(input.value))) return { ok: false, message: "Invalid completion type." };
-      await updateGameFields(user, input.gameId, { completionType: input.value });
+      const { rebalanced } = await updateGameFields(user, input.gameId, { completionType: input.value });
+      revalidateFullApp = rebalanced;
     } else if (input.field === "personalInterest") {
       if (!isPersonalInterest(String(input.value))) return { ok: false, message: "Invalid interest." };
       const { rebalanced } = await updateGameFields(user, input.gameId, { personalInterest: input.value });

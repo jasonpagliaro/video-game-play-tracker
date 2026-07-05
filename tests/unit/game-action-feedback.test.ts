@@ -35,12 +35,15 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("@/lib/db/repository", () => repositoryMocks);
 
+import { revalidatePath } from "next/cache";
 import {
+  autoSaveGameFieldAction,
   queueCommandFeedbackAction,
   returnParkedGameToQueueFeedbackAction,
   sortQueueFeedbackAction,
 } from "@/server/actions/game-actions";
 import { ACTION_FEEDBACK_COOKIE, parseActionFeedback } from "@/lib/action-feedback";
+import type { GameVisibilitySnapshot } from "@/lib/backlog/autosave";
 
 function formData(values: Record<string, string>) {
   const data = new FormData();
@@ -50,9 +53,26 @@ function formData(values: Record<string, string>) {
   return data;
 }
 
+function visibilitySnapshot(overrides: Partial<GameVisibilitySnapshot> = {}): GameVisibilitySnapshot {
+  return {
+    id: "game-1",
+    title: "Game",
+    status: "not_started",
+    currentRotation: false,
+    queueRank: null,
+    backlogSlot: "action",
+    completionType: "completable",
+    syncState: "imported",
+    playtimeMinutes: 0,
+    detailHref: "/games/game-1",
+    ...overrides,
+  };
+}
+
 describe("game action feedback", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    repositoryMocks.getGameVisibilitySnapshot.mockResolvedValue(visibilitySnapshot());
   });
 
   it("confirms when a game is forced into Up next", async () => {
@@ -104,5 +124,55 @@ describe("game action feedback", () => {
       status: "success",
       message: "Returned to queue.",
     });
+  });
+});
+
+describe("game autosave revalidation", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    repositoryMocks.getGameVisibilitySnapshot.mockResolvedValue(visibilitySnapshot());
+  });
+
+  it("uses detail-only revalidation when backlog category saves without queue rebalance", async () => {
+    repositoryMocks.updateGameFields.mockResolvedValueOnce({ rebalanced: false });
+    repositoryMocks.getGameVisibilitySnapshot.mockResolvedValueOnce(visibilitySnapshot({ backlogSlot: "puzzle" }));
+
+    const result = await autoSaveGameFieldAction({ gameId: "game-1", field: "backlogSlot", value: "puzzle" });
+
+    expect(result).toMatchObject({ ok: true, value: { backlogSlot: "puzzle" } });
+    expect(repositoryMocks.updateGameFields).toHaveBeenCalledWith(
+      { id: "user-1", email: "user@example.com", role: "authenticated" },
+      "game-1",
+      { backlogSlot: "puzzle" },
+    );
+    expect(revalidatePath).toHaveBeenCalledTimes(1);
+    expect(revalidatePath).toHaveBeenCalledWith("/games/game-1");
+  });
+
+  it("uses full app revalidation when finish style saves with queue rebalance", async () => {
+    repositoryMocks.updateGameFields.mockResolvedValueOnce({ rebalanced: true });
+    repositoryMocks.getGameVisibilitySnapshot.mockResolvedValueOnce(
+      visibilitySnapshot({ completionType: "sandbox", queueRank: 1000 }),
+    );
+
+    const result = await autoSaveGameFieldAction({ gameId: "game-1", field: "completionType", value: "sandbox" });
+
+    expect(result).toMatchObject({ ok: true, value: { completionType: "sandbox", queueRank: 1000 } });
+    expect(repositoryMocks.updateGameFields).toHaveBeenCalledWith(
+      { id: "user-1", email: "user@example.com", role: "authenticated" },
+      "game-1",
+      { completionType: "sandbox" },
+    );
+    expect(vi.mocked(revalidatePath).mock.calls.map(([path]) => path)).toEqual([
+      "/",
+      "/backlog",
+      "/rotation",
+      "/queue",
+      "/completed",
+      "/dnf",
+      "/parking-lot",
+      "/ongoing",
+      "/games/game-1",
+    ]);
   });
 });
