@@ -1,7 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 
+import {
+  ACTION_FEEDBACK_COOKIE,
+  createActionFeedback,
+  serializeActionFeedback,
+} from "@/lib/action-feedback";
 import type {
   BacklogSlot,
   CompletionType,
@@ -57,16 +63,6 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to save change.";
 }
 
-export type ActionFeedbackState = {
-  status: "idle" | "success" | "error";
-  message: string | null;
-  submittedAt: number;
-};
-
-function actionFeedback(status: Exclude<ActionFeedbackState["status"], "idle">, message: string): ActionFeedbackState {
-  return { status, message, submittedAt: Date.now() };
-}
-
 function queueCommandFeedbackMessage(command: string) {
   if (command === "add_to_queue") return "Added to queue.";
   if (command === "force_next_in_queue") return "Moved to Up next.";
@@ -77,6 +73,16 @@ function queueCommandFeedbackMessage(command: string) {
   if (command === "demote") return "Moved down.";
   if (command === "move_before" || command === "move_after") return "Queue position updated.";
   return "Queue updated.";
+}
+
+async function setActionFeedback(status: "success" | "error", message: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(ACTION_FEEDBACK_COOKIE, serializeActionFeedback(createActionFeedback(status, message)), {
+    maxAge: 30,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
 }
 
 async function snapshotForSavedGame(user: Awaited<ReturnType<typeof requireUser>>, gameId: string) {
@@ -204,16 +210,13 @@ async function runQueueCommandAction(user: Awaited<ReturnType<typeof requireUser
   revalidateApp();
 }
 
-export async function queueCommandFeedbackAction(
-  _state: ActionFeedbackState,
-  formData: FormData,
-): Promise<ActionFeedbackState> {
+export async function queueCommandFeedbackAction(formData: FormData) {
   const user = await requireUser();
   try {
     await runQueueCommandAction(user, formData);
-    return actionFeedback("success", queueCommandFeedbackMessage(String(formData.get("command"))));
+    await setActionFeedback("success", queueCommandFeedbackMessage(String(formData.get("command"))));
   } catch (error) {
-    return actionFeedback("error", errorMessage(error));
+    await setActionFeedback("error", errorMessage(error));
   }
 }
 
@@ -229,16 +232,13 @@ async function runSortQueueAction(user: Awaited<ReturnType<typeof requireUser>>,
   revalidateApp();
 }
 
-export async function sortQueueFeedbackAction(
-  _state: ActionFeedbackState,
-  formData: FormData,
-): Promise<ActionFeedbackState> {
+export async function sortQueueFeedbackAction(formData: FormData) {
   const user = await requireUser();
   try {
     await runSortQueueAction(user, formData);
-    return actionFeedback("success", "Queue sorted.");
+    await setActionFeedback("success", "Queue sorted.");
   } catch (error) {
-    return actionFeedback("error", errorMessage(error));
+    await setActionFeedback("error", errorMessage(error));
   }
 }
 
@@ -286,16 +286,13 @@ async function runReturnParkedGameToQueueAction(user: Awaited<ReturnType<typeof 
   revalidateApp(gameId);
 }
 
-export async function returnParkedGameToQueueFeedbackAction(
-  _state: ActionFeedbackState,
-  formData: FormData,
-): Promise<ActionFeedbackState> {
+export async function returnParkedGameToQueueFeedbackAction(formData: FormData) {
   const user = await requireUser();
   try {
     await runReturnParkedGameToQueueAction(user, formData);
-    return actionFeedback("success", "Returned to queue.");
+    await setActionFeedback("success", "Returned to queue.");
   } catch (error) {
-    return actionFeedback("error", errorMessage(error));
+    await setActionFeedback("error", errorMessage(error));
   }
 }
 

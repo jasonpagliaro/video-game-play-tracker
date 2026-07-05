@@ -17,9 +17,16 @@ const repositoryMocks = vi.hoisted(() => ({
   updateGameFields: vi.fn(),
   updateGameStatus: vi.fn(),
 }));
+const cookieMocks = vi.hoisted(() => ({
+  set: vi.fn(),
+}));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: vi.fn(async () => cookieMocks),
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -32,14 +39,8 @@ import {
   queueCommandFeedbackAction,
   returnParkedGameToQueueFeedbackAction,
   sortQueueFeedbackAction,
-  type ActionFeedbackState,
 } from "@/server/actions/game-actions";
-
-const idleState: ActionFeedbackState = {
-  status: "idle",
-  message: null,
-  submittedAt: 0,
-};
+import { ACTION_FEEDBACK_COOKIE, parseActionFeedback } from "@/lib/action-feedback";
 
 function formData(values: Record<string, string>) {
   const data = new FormData();
@@ -55,35 +56,37 @@ describe("game action feedback", () => {
   });
 
   it("confirms when a game is forced into Up next", async () => {
-    const result = await queueCommandFeedbackAction(
-      idleState,
-      formData({ gameId: "game-1", command: "force_next_in_queue" }),
-    );
+    await queueCommandFeedbackAction(formData({ gameId: "game-1", command: "force_next_in_queue" }));
 
     expect(repositoryMocks.applyQueueCommand).toHaveBeenCalledWith(
       { id: "user-1", email: "user@example.com", role: "authenticated" },
       { gameId: "game-1", command: "force_next_in_queue", targetGameId: undefined },
     );
-    expect(result.status).toBe("success");
-    expect(result.message).toBe("Moved to Up next.");
-    expect(result.submittedAt).toBeGreaterThan(0);
+    expect(cookieMocks.set).toHaveBeenCalledWith(
+      ACTION_FEEDBACK_COOKIE,
+      expect.any(String),
+      expect.objectContaining({ maxAge: 30, path: "/", sameSite: "lax" }),
+    );
+    expect(parseActionFeedback(cookieMocks.set.mock.calls[0][1])).toMatchObject({
+      status: "success",
+      message: "Moved to Up next.",
+    });
   });
 
   it("returns queue action errors for user-visible feedback", async () => {
     repositoryMocks.applyQueueCommand.mockRejectedValueOnce(new Error("Locked queue items cannot be moved."));
 
-    const result = await queueCommandFeedbackAction(
-      idleState,
-      formData({ gameId: "game-1", command: "promote" }),
-    );
+    await queueCommandFeedbackAction(formData({ gameId: "game-1", command: "promote" }));
 
-    expect(result.status).toBe("error");
-    expect(result.message).toBe("Locked queue items cannot be moved.");
+    expect(parseActionFeedback(cookieMocks.set.mock.calls[0][1])).toMatchObject({
+      status: "error",
+      message: "Locked queue items cannot be moved.",
+    });
   });
 
   it("confirms sort and return-to-queue actions", async () => {
-    const sorted = await sortQueueFeedbackAction(idleState, formData({ preset: "app_recommendation" }));
-    const returned = await returnParkedGameToQueueFeedbackAction(idleState, formData({ gameId: "game-1" }));
+    await sortQueueFeedbackAction(formData({ preset: "app_recommendation" }));
+    await returnParkedGameToQueueFeedbackAction(formData({ gameId: "game-1" }));
 
     expect(repositoryMocks.sortUserQueue).toHaveBeenCalledWith(
       { id: "user-1", email: "user@example.com", role: "authenticated" },
@@ -93,7 +96,13 @@ describe("game action feedback", () => {
       { id: "user-1", email: "user@example.com", role: "authenticated" },
       "game-1",
     );
-    expect(sorted).toMatchObject({ status: "success", message: "Queue sorted." });
-    expect(returned).toMatchObject({ status: "success", message: "Returned to queue." });
+    expect(parseActionFeedback(cookieMocks.set.mock.calls[0][1])).toMatchObject({
+      status: "success",
+      message: "Queue sorted.",
+    });
+    expect(parseActionFeedback(cookieMocks.set.mock.calls[1][1])).toMatchObject({
+      status: "success",
+      message: "Returned to queue.",
+    });
   });
 });

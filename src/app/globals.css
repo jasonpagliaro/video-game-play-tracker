@@ -135,3 +135,13 @@ select,
 textarea {
   letter-spacing: 0;
 }
+
+@keyframes action-feedback-dismiss {
+  0%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
