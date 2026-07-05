@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { toast } from "sonner";
 
 import {
   ACTION_FEEDBACK_COOKIE,
@@ -15,19 +14,11 @@ export function ActionFeedbackAnnouncer({
   feedback: ActionFeedbackPayload | null;
 }) {
   const feedbackId = feedback?.id;
-  const feedbackMessage = feedback?.message;
-  const feedbackStatus = feedback?.status;
 
   useEffect(() => {
-    if (!feedbackMessage || !feedbackStatus) return;
-
-    if (feedbackStatus === "success") {
-      toast.success(feedbackMessage);
-    } else {
-      toast.error(feedbackMessage);
-    }
+    if (!feedbackId) return;
     document.cookie = `${ACTION_FEEDBACK_COOKIE}=; Max-Age=0; path=/; SameSite=Lax`;
-  }, [feedbackId, feedbackMessage, feedbackStatus]);
+  }, [feedbackId]);
 
   if (!feedback) return null;
 
