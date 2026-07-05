@@ -7,6 +7,7 @@ import { ChevronsUp, ListPlus, Minus, Plus } from "lucide-react";
 import { AutoSaveStatus } from "@/components/autosave/auto-save-status";
 import { useAutoSaveField } from "@/components/autosave/use-auto-save-field";
 import { StatusResolutionDialog, type StatusResolutionIntent } from "@/components/backlog/status-resolution-dialog";
+import { useActionFeedback } from "@/components/ui/action-feedback";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,9 +33,11 @@ import { formatDate } from "@/lib/backlog/format";
 import type { AppSettings, Game, GameSummary } from "@/lib/backlog/types";
 import {
   autoSaveGameFieldAction,
-  queueCommandAction,
-  returnParkedGameToQueueAction,
+  queueCommandFeedbackAction,
+  returnParkedGameToQueueFeedbackAction,
 } from "@/server/actions/game-actions";
+
+type FeedbackFormAction = (formData: FormData) => void;
 
 export function GameDetailEditor({
   game,
@@ -225,8 +228,11 @@ function AutoSaveSelectField({
 }
 
 function QueueMembershipControl({ game }: { game: Game }) {
+  const queueFormAction = useActionFeedback(queueCommandFeedbackAction);
+  const returnQueueFormAction = useActionFeedback(returnParkedGameToQueueFeedbackAction);
   const queued = game.queueRank != null;
   const eligible = canAddToQueue(game);
+
   if (game.parkedForLater) {
     return (
       <div className="grid gap-2">
@@ -235,7 +241,7 @@ function QueueMembershipControl({ game }: { game: Game }) {
           <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
             Parked until {formatDate(game.reassessAfter)}
           </span>
-          <form action={returnParkedGameToQueueAction}>
+          <form action={returnQueueFormAction}>
             <input type="hidden" name="gameId" value={game.id} />
             <PendingSubmitButton
               size="sm"
@@ -247,7 +253,7 @@ function QueueMembershipControl({ game }: { game: Game }) {
               Return to queue
             </PendingSubmitButton>
           </form>
-          <ForceNextQueueButton game={game} />
+          <ForceNextQueueButton action={queueFormAction} game={game} />
         </div>
       </div>
     );
@@ -259,7 +265,7 @@ function QueueMembershipControl({ game }: { game: Game }) {
         {queued ? (
           <>
             <span className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">Queued</span>
-            <form action={queueCommandAction}>
+            <form action={queueFormAction}>
               <input type="hidden" name="gameId" value={game.id} />
               <input type="hidden" name="command" value="remove_from_queue" />
               <PendingSubmitButton
@@ -272,11 +278,11 @@ function QueueMembershipControl({ game }: { game: Game }) {
                 Remove
               </PendingSubmitButton>
             </form>
-            <ForceNextQueueButton game={game} />
+            <ForceNextQueueButton action={queueFormAction} game={game} />
           </>
         ) : (
           <>
-            <form action={queueCommandAction}>
+            <form action={queueFormAction}>
               <input type="hidden" name="gameId" value={game.id} />
               <input type="hidden" name="command" value="add_to_queue" />
               <PendingSubmitButton
@@ -290,7 +296,7 @@ function QueueMembershipControl({ game }: { game: Game }) {
                 Add to queue
               </PendingSubmitButton>
             </form>
-            <ForceNextQueueButton game={game} />
+            <ForceNextQueueButton action={queueFormAction} game={game} />
           </>
         )}
       </div>
@@ -298,9 +304,17 @@ function QueueMembershipControl({ game }: { game: Game }) {
   );
 }
 
-function ForceNextQueueButton({ game, disabled = false }: { game: Game; disabled?: boolean }) {
+function ForceNextQueueButton({
+  action,
+  game,
+  disabled = false,
+}: {
+  action: FeedbackFormAction;
+  game: Game;
+  disabled?: boolean;
+}) {
   return (
-    <form action={queueCommandAction}>
+    <form action={action}>
       <input type="hidden" name="gameId" value={game.id} />
       <input type="hidden" name="command" value="force_next_in_queue" />
       <PendingSubmitButton

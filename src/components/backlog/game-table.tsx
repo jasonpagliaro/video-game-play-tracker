@@ -34,6 +34,7 @@ import {
   SyncStateBadge,
 } from "@/components/badges/game-badges";
 import { StatusResolutionDialog, type StatusResolutionIntent } from "@/components/backlog/status-resolution-dialog";
+import { useActionFeedback } from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -77,8 +78,8 @@ import type { AppSettings, GameSummary } from "@/lib/backlog/types";
 import {
   autoSaveGameFieldAction,
   bulkUpdateGamesAction,
-  queueCommandAction,
-  sortQueueAction,
+  queueCommandFeedbackAction,
+  sortQueueFeedbackAction,
 } from "@/server/actions/game-actions";
 
 type GhostEntry = {
@@ -94,6 +95,8 @@ type GhostEntry = {
 type QueueMoveIntent = {
   game: GameSummary;
 } | null;
+
+type FeedbackFormAction = (formData: FormData) => void;
 
 const QUEUE_SORT_OPTIONS = [
   { value: "app_recommendation", label: "App recommendation" },
@@ -126,6 +129,7 @@ export function GameTable({
   const [queueMoveIntent, setQueueMoveIntent] = useState<QueueMoveIntent>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [ghosts, setGhosts] = useState<GhostEntry[]>([]);
+  const sortQueueFormAction = useActionFeedback(sortQueueFeedbackAction);
   const activeGames = games.filter((game) => game.currentRotation);
   const activeFull = activeGames.length >= settings.maxActiveRotationCount;
   const queuedGames = useMemo(
@@ -416,7 +420,7 @@ export function GameTable({
           </Select>
         </div>
         {showQueueControls ? (
-          <form action={sortQueueAction} className="flex flex-wrap items-center gap-2">
+          <form action={sortQueueFormAction} className="flex flex-wrap items-center gap-2">
             <Select name="preset" defaultValue="app_recommendation">
               <SelectTrigger className="h-9 w-52">
                 <SelectValue />
@@ -664,11 +668,13 @@ function GameStatusAutoSelect({
 }
 
 function QueueStatusControl({ game, position }: { game: GameSummary; position: number | null }) {
+  const queueFormAction = useActionFeedback(queueCommandFeedbackAction);
+
   if (game.queueRank == null) {
     const eligible = canAddToQueue(game);
     return (
       <div className="flex min-w-40 flex-wrap items-center gap-1" aria-live="polite">
-        <form action={queueCommandAction}>
+        <form action={queueFormAction}>
           <input type="hidden" name="gameId" value={game.id} />
           <input type="hidden" name="command" value="add_to_queue" />
           <PendingSubmitButton
@@ -682,7 +688,7 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
             Queue
           </PendingSubmitButton>
         </form>
-        <ForceNextQueueButton game={game} label="Up next" />
+        <ForceNextQueueButton action={queueFormAction} game={game} label="Up next" />
       </div>
     );
   }
@@ -693,8 +699,8 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
       <span className="rounded-md border border-border px-2 py-1 font-mono text-xs">
         {position === 1 ? "Next" : position ? `#${position}` : "Queued"}
       </span>
-      <ForceNextQueueButton game={game} disabled={forceAlreadyApplied} />
-      <form action={queueCommandAction}>
+      <ForceNextQueueButton action={queueFormAction} game={game} disabled={forceAlreadyApplied} />
+      <form action={queueFormAction}>
         <input type="hidden" name="gameId" value={game.id} />
         <input type="hidden" name="command" value="remove_from_queue" />
         <PendingSubmitButton
@@ -714,16 +720,18 @@ function QueueStatusControl({ game, position }: { game: GameSummary; position: n
 }
 
 function ForceNextQueueButton({
+  action,
   game,
   label,
   disabled,
 }: {
+  action: FeedbackFormAction;
   game: GameSummary;
   label?: string;
   disabled?: boolean;
 }) {
   return (
-    <form action={queueCommandAction}>
+    <form action={action}>
       <input type="hidden" name="gameId" value={game.id} />
       <input type="hidden" name="command" value="force_next_in_queue" />
       <PendingSubmitButton
@@ -752,6 +760,7 @@ function QueueMoveControls({
   movableGames: GameSummary[];
   onMovePrecise: (intent: QueueMoveIntent) => void;
 }) {
+  const queueFormAction = useActionFeedback(queueCommandFeedbackAction);
   const movableIndex = movableGames.findIndex((item) => item.id === game.id);
   const disabled = game.queueLocked || movableIndex === -1;
   const isFirst = movableIndex <= 0;
@@ -760,6 +769,7 @@ function QueueMoveControls({
   return (
     <div className="flex gap-1">
       <QueueCommandButton
+        action={queueFormAction}
         gameId={game.id}
         command="move_to_top"
         title="Move to top"
@@ -768,6 +778,7 @@ function QueueMoveControls({
         <ChevronsUp className="h-4 w-4" />
       </QueueCommandButton>
       <QueueCommandButton
+        action={queueFormAction}
         gameId={game.id}
         command="promote"
         title="Promote"
@@ -776,6 +787,7 @@ function QueueMoveControls({
         <ArrowUp className="h-4 w-4" />
       </QueueCommandButton>
       <QueueCommandButton
+        action={queueFormAction}
         gameId={game.id}
         command="demote"
         title="Demote"
@@ -784,6 +796,7 @@ function QueueMoveControls({
         <ArrowDown className="h-4 w-4" />
       </QueueCommandButton>
       <QueueCommandButton
+        action={queueFormAction}
         gameId={game.id}
         command="move_to_bottom"
         title="Move to bottom"
@@ -807,12 +820,14 @@ function QueueMoveControls({
 }
 
 function QueueCommandButton({
+  action,
   gameId,
   command,
   title,
   disabled,
   children,
 }: {
+  action: FeedbackFormAction;
   gameId: string;
   command: string;
   title: string;
@@ -820,7 +835,7 @@ function QueueCommandButton({
   children: ReactNode;
 }) {
   return (
-    <form action={queueCommandAction}>
+    <form action={action}>
       <input type="hidden" name="gameId" value={gameId} />
       <input type="hidden" name="command" value={command} />
       <PendingSubmitButton
@@ -848,6 +863,7 @@ function QueueMoveDialog({
   queuedGames: GameSummary[];
   onOpenChange: (open: boolean) => void;
 }) {
+  const queueFormAction = useActionFeedback(queueCommandFeedbackAction);
   const targets = useMemo(
     () => queuedGames.filter((game) => game.id !== intent?.game.id),
     [intent?.game.id, queuedGames],
@@ -868,7 +884,7 @@ function QueueMoveDialog({
           </DialogDescription>
         </DialogHeader>
         {intent ? (
-          <form action={queueCommandAction} className="grid gap-4" onSubmit={() => onOpenChange(false)}>
+          <form action={queueFormAction} className="grid gap-4" onSubmit={() => onOpenChange(false)}>
             <input type="hidden" name="gameId" value={intent.game.id} />
             <input type="hidden" name="command" value={command} />
             <input type="hidden" name="targetGameId" value={selectedTargetGameId} />

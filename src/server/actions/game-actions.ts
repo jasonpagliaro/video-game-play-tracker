@@ -57,6 +57,28 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unable to save change.";
 }
 
+export type ActionFeedbackState = {
+  status: "idle" | "success" | "error";
+  message: string | null;
+  submittedAt: number;
+};
+
+function actionFeedback(status: Exclude<ActionFeedbackState["status"], "idle">, message: string): ActionFeedbackState {
+  return { status, message, submittedAt: Date.now() };
+}
+
+function queueCommandFeedbackMessage(command: string) {
+  if (command === "add_to_queue") return "Added to queue.";
+  if (command === "force_next_in_queue") return "Moved to Up next.";
+  if (command === "remove_from_queue") return "Removed from queue.";
+  if (command === "move_to_top") return "Moved to top.";
+  if (command === "move_to_bottom") return "Moved to bottom.";
+  if (command === "promote") return "Moved up.";
+  if (command === "demote") return "Moved down.";
+  if (command === "move_before" || command === "move_after") return "Queue position updated.";
+  return "Queue updated.";
+}
+
 async function snapshotForSavedGame(user: Awaited<ReturnType<typeof requireUser>>, gameId: string) {
   const snapshot = await getGameVisibilitySnapshot(user, gameId);
   if (!snapshot) throw new Error("Game not found.");
@@ -167,6 +189,10 @@ export async function updateGameFieldsAction(formData: FormData) {
 
 export async function queueCommandAction(formData: FormData) {
   const user = await requireUser();
+  await runQueueCommandAction(user, formData);
+}
+
+async function runQueueCommandAction(user: Awaited<ReturnType<typeof requireUser>>, formData: FormData) {
   const gameId = String(formData.get("gameId"));
   const command = String(formData.get("command"));
   if (!isQueueCommand(command)) throw new Error("Invalid queue command.");
@@ -178,12 +204,42 @@ export async function queueCommandAction(formData: FormData) {
   revalidateApp();
 }
 
+export async function queueCommandFeedbackAction(
+  _state: ActionFeedbackState,
+  formData: FormData,
+): Promise<ActionFeedbackState> {
+  const user = await requireUser();
+  try {
+    await runQueueCommandAction(user, formData);
+    return actionFeedback("success", queueCommandFeedbackMessage(String(formData.get("command"))));
+  } catch (error) {
+    return actionFeedback("error", errorMessage(error));
+  }
+}
+
 export async function sortQueueAction(formData: FormData) {
   const user = await requireUser();
+  await runSortQueueAction(user, formData);
+}
+
+async function runSortQueueAction(user: Awaited<ReturnType<typeof requireUser>>, formData: FormData) {
   const preset = String(formData.get("preset"));
   if (!isQueueSortPreset(preset)) throw new Error("Invalid queue sort.");
   await sortUserQueue(user, preset);
   revalidateApp();
+}
+
+export async function sortQueueFeedbackAction(
+  _state: ActionFeedbackState,
+  formData: FormData,
+): Promise<ActionFeedbackState> {
+  const user = await requireUser();
+  try {
+    await runSortQueueAction(user, formData);
+    return actionFeedback("success", "Queue sorted.");
+  } catch (error) {
+    return actionFeedback("error", errorMessage(error));
+  }
 }
 
 export async function rebalanceQueueAction() {
@@ -221,9 +277,26 @@ export async function parkGameForLaterAction(formData: FormData) {
 
 export async function returnParkedGameToQueueAction(formData: FormData) {
   const user = await requireUser();
+  await runReturnParkedGameToQueueAction(user, formData);
+}
+
+async function runReturnParkedGameToQueueAction(user: Awaited<ReturnType<typeof requireUser>>, formData: FormData) {
   const gameId = String(formData.get("gameId"));
   await returnParkedGameToQueue(user, gameId);
   revalidateApp(gameId);
+}
+
+export async function returnParkedGameToQueueFeedbackAction(
+  _state: ActionFeedbackState,
+  formData: FormData,
+): Promise<ActionFeedbackState> {
+  const user = await requireUser();
+  try {
+    await runReturnParkedGameToQueueAction(user, formData);
+    return actionFeedback("success", "Returned to queue.");
+  } catch (error) {
+    return actionFeedback("error", errorMessage(error));
+  }
 }
 
 export async function markGameWontCompleteFromSuggestionAction(formData: FormData) {
