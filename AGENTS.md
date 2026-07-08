@@ -25,3 +25,23 @@ Repo-specific build gotchas:
 - Quote shell paths that include App Router route groups, for example `src/app/(app)/import/page.tsx`.
 - `tsconfig.json` targets ES2017, so avoid BigInt literals like `2n`; use `BigInt(2)` or `BigInt("76561198000000000")`.
 - For App Router or server action work, read the matching local docs under `node_modules/next/dist/docs/01-app/01-getting-started/` before editing implementation code.
+
+<!-- project-continuity:begin -->
+## Project Continuity
+
+This project uses the Project Continuity System MVP plus the opt-in self-improvement loop. Before nontrivial work, read:
+
+1. `docs/project-continuity/project/project-continuity.yaml`
+2. `docs/project-continuity/project/PURPOSE.md`
+3. `docs/project-continuity/project/STATUS.md`
+4. `docs/project-continuity/project/NEXT.md`
+5. `docs/project-continuity/project/USER_INPUT.md`
+6. `docs/project-continuity/project/HANDOFF.md`
+7. `docs/project-continuity/project/DECISIONS/README.md` and relevant decisions
+8. `docs/project-continuity/spec/SELF_IMPROVEMENT.md`
+9. `docs/project-continuity/project/PROPOSED_CHANGES.md`
+
+At the end of meaningful work, update only the continuity files whose facts changed and run `npm run continuity:check`. Record only evidence-backed, actionable project-improvement ideas in `PROPOSED_CHANGES.md`.
+
+Keep existing project-specific instructions authoritative. This section only adds continuity entry points.
+<!-- project-continuity:end -->

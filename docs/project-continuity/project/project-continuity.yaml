@@ -1,0 +1,94 @@
+schema: project-continuity.v1
+system_name: Project Continuity System
+system_version: 0.1.0
+status: installed
+declared_at: 2026-07-07
+
+repository:
+  provider: github
+  name: jasonpagliaro/video-game-play-tracker
+  url: git@github.com:jasonpagliaro/video-game-play-tracker.git
+  local_path: /Users/jason/Projects/video-game-play-tracker
+
+install:
+  target: video-game-play-tracker
+  install_depth: mvp_plus_self_improvement
+  source_system: /Users/jason/Projects/project-continuity-system
+  full_spec_copied: false
+  ci_enforcement_enabled: false
+
+canonical_files:
+  agents: AGENTS.md
+  purpose: docs/project-continuity/project/PURPOSE.md
+  status: docs/project-continuity/project/STATUS.md
+  next: docs/project-continuity/project/NEXT.md
+  handoff: docs/project-continuity/project/HANDOFF.md
+  user_input: docs/project-continuity/project/USER_INPUT.md
+  decisions: docs/project-continuity/project/DECISIONS/
+  self_improvement: docs/project-continuity/spec/SELF_IMPROVEMENT.md
+  proposed_changes: docs/project-continuity/project/PROPOSED_CHANGES.md
+  validator: scripts/validate_continuity_pack.py
+
+mvp_required_files:
+  - AGENTS.md
+  - docs/project-continuity/project/project-continuity.yaml
+  - docs/project-continuity/project/PURPOSE.md
+  - docs/project-continuity/project/STATUS.md
+  - docs/project-continuity/project/NEXT.md
+  - docs/project-continuity/project/HANDOFF.md
+  - docs/project-continuity/project/USER_INPUT.md
+  - docs/project-continuity/project/DECISIONS/README.md
+
+project_required_files:
+  - docs/project-continuity/project/DECISIONS/0001-adopt-project-continuity-system.md
+  - docs/project-continuity/spec/SELF_IMPROVEMENT.md
+  - docs/project-continuity/project/PROPOSED_CHANGES.md
+  - docs/project-continuity/project/archive/README.md
+  - scripts/validate_continuity_pack.py
+
+install_policy:
+  default_profile: mvp
+  advanced_or_full_files: self_improvement_only
+  old_project_order: preflight_then_mvp_then_audit
+  guided_audit_before_install: opt_in
+  rule: The repo starts with the MVP files and adds only the self-improvement policy, proposal queue, first decision record, and local validator. The full reusable spec is not copied.
+
+self_improvement:
+  policy: docs/project-continuity/spec/SELF_IMPROVEMENT.md
+  queue: docs/project-continuity/project/PROPOSED_CHANGES.md
+  cadence: session_end
+  rule: Record only evidence-backed, actionable project-improvement ideas with a practical next step.
+
+validation:
+  command: python3 scripts/validate_continuity_pack.py
+  package_script: continuity:check
+  ci_enforcement_enabled: false
+  run_when:
+    - continuity files change
+    - continuity workflow instructions change
+    - validation rules change
+
+ai_update_policy:
+  automatic:
+    - factual status updates
+    - handoff notes
+    - next actions within approved scope
+    - typo and broken-link fixes
+  flag_for_review:
+    - wording clarifications
+    - project-improvement proposals
+    - validation checklist refinements
+  explicit_user_input_required:
+    - project goals
+    - required MVP files
+    - gate policy
+    - accepted decisions
+    - versioning rules
+    - migration rules
+    - destructive or archive behavior
+    - secrets or credentials
+    - production behavior changes
+    - project scope
+
+current_next_action: docs/project-continuity/project/NEXT.md
+open_questions: docs/project-continuity/project/USER_INPUT.md

@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "continuity:check": "python3 scripts/validate_continuity_pack.py",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",

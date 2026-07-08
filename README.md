@@ -42,6 +42,7 @@ Without Supabase env vars, local development renders with a placeholder user and
 
 ```bash
 npm run dev
+npm run continuity:check
 npm run lint
 npm test
 npm run build
@@ -55,6 +56,12 @@ For environment validation after dependency or toolchain changes, run:
 npm test
 npm run lint
 npm run build
+```
+
+For project-continuity documentation changes, run:
+
+```bash
+npm run continuity:check
 ```
 
 Known local environment notes:
