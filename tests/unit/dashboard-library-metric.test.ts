@@ -54,13 +54,13 @@ function game(overrides: Partial<GameSummary> = {}): GameSummary {
 }
 
 describe("dashboard library queue metric", () => {
-  it("shows queued games over total library with a queue share meter", () => {
+  it("shows queued games over total library with progress toward an empty queue", () => {
     const settings = defaultSettings();
     const summary = getDashboardSummary(
       [
         game({ id: "queued-1", queueRank: 1000 }),
-        game({ id: "queued-2", queueRank: 2000 }),
-        game({ id: "unqueued" }),
+        game({ id: "unqueued-1" }),
+        game({ id: "unqueued-2" }),
         game({ id: "completed", status: "completed", queueRank: 3000 }),
       ],
       settings,
@@ -70,12 +70,13 @@ describe("dashboard library queue metric", () => {
     const statusHtml = renderToStaticMarkup(createElement(DashboardStatusGrid, { summary, settings }));
 
     for (const html of [overviewHtml, statusHtml]) {
-      expect(html).toContain("2 / 4");
+      expect(html).toContain("1 / 4");
       expect(html).toContain("in queue / library");
-      expect(html).toContain("50% queued");
-      expect(html).toContain("0% is clear");
+      expect(html).toContain("75% clear");
+      expect(html).toContain("100% at empty queue");
       expect(html).toContain('role="meter"');
-      expect(html).toContain('aria-valuenow="50"');
+      expect(html).toContain('aria-label="Progress toward empty queue"');
+      expect(html).toContain('aria-valuenow="75"');
     }
   });
 });

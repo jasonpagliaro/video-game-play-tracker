@@ -2,7 +2,7 @@
 
 ## Current Handoff
 
-The dashboard Library metric now renders active queue count over total library count, with a compact queue-share meter on dashboard count surfaces.
+The dashboard Library metric now renders active queue count over total library count, with a compact progress meter that fills as games are removed from the queue.
 
 The Project Continuity System MVP files, self-improvement policy, proposal queue, and local continuity validator are installed.
 
