@@ -1,9 +1,10 @@
-import { Archive, CheckCircle2, CircleSlash, HardDrive, RotateCw } from "lucide-react";
+import { Archive, CheckCircle2, CircleSlash, HardDrive, RotateCw, type LucideIcon } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { formatMinutes } from "@/lib/backlog/format";
 import type { DashboardSummary } from "@/lib/backlog/dashboard";
 import type { AppSettings } from "@/lib/backlog/types";
+import { getLibraryQueueMetric, LibraryQueueProgress } from "./library-queue-metric";
 
 export function DashboardStatusGrid({
   summary,
@@ -12,7 +13,14 @@ export function DashboardStatusGrid({
   summary: DashboardSummary;
   settings: AppSettings;
 }) {
-  const items = [
+  const libraryQueueMetric = getLibraryQueueMetric(summary);
+  const items: Array<{
+    label: string;
+    value: string;
+    detail: string;
+    icon: LucideIcon;
+    progress?: boolean;
+  }> = [
     {
       label: "Rotation",
       value: `${summary.counts.active}/${settings.maxActiveRotationCount}`,
@@ -39,9 +47,10 @@ export function DashboardStatusGrid({
     },
     {
       label: "Library",
-      value: `${summary.counts.totalGames} / ${summary.queue.total}`,
-      detail: `${summary.counts.steamIdentified} Steam IDs; ${formatMinutes(summary.counts.totalPlaytimeMinutes)} tracked`,
+      value: libraryQueueMetric.value,
+      detail: `${libraryQueueMetric.ratioLabel}; ${summary.counts.steamIdentified} Steam IDs; ${formatMinutes(summary.counts.totalPlaytimeMinutes)} tracked`,
       icon: Archive,
+      progress: true,
     },
   ];
 
@@ -57,6 +66,7 @@ export function DashboardStatusGrid({
             <div>
               <div className="font-mono text-2xl font-semibold">{item.value}</div>
               <div className="mt-1 text-xs text-muted-foreground">{item.detail}</div>
+              {item.progress ? <LibraryQueueProgress summary={summary} className="mt-2" /> : null}
             </div>
           </CardContent>
         </Card>

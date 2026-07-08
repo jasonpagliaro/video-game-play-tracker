@@ -2,6 +2,8 @@
 
 ## Current Handoff
 
+The dashboard Library metric now renders active queue count over total library count, with a compact queue-share meter on dashboard count surfaces.
+
 The Project Continuity System MVP files, self-improvement policy, proposal queue, and local continuity validator are installed.
 
 Before changing the project, read `AGENTS.md`, the continuity YAML, purpose, status, next action, user-input gates, handoff notes, decisions, self-improvement policy, and proposal queue.

@@ -20,6 +20,7 @@ The continuity install is documentation and validation only. It does not change 
 
 ## Recently Completed
 
+- Changed the dashboard Library metric to show active queue count over total library count and added a compact queue-share meter.
 - Installed the Project Continuity System MVP file set.
 - Added the controlled self-improvement policy and `PROPOSED_CHANGES.md` queue.
 - Added a local continuity validator and package script.

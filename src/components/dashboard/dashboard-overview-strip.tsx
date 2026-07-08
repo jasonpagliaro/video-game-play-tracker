@@ -1,8 +1,18 @@
-import { AlertTriangle, Archive, CheckCircle2, CircleSlash, HardDrive, Info, RotateCw } from "lucide-react";
+import {
+  AlertTriangle,
+  Archive,
+  CheckCircle2,
+  CircleSlash,
+  HardDrive,
+  Info,
+  RotateCw,
+  type LucideIcon,
+} from "lucide-react";
 
 import { formatMinutes } from "@/lib/backlog/format";
 import type { DashboardSummary } from "@/lib/backlog/dashboard";
 import type { AppSettings } from "@/lib/backlog/types";
+import { getLibraryQueueMetric, LibraryQueueProgress } from "./library-queue-metric";
 
 export function DashboardOverviewStrip({
   summary,
@@ -11,7 +21,14 @@ export function DashboardOverviewStrip({
   summary: DashboardSummary;
   settings: AppSettings;
 }) {
-  const items = [
+  const libraryQueueMetric = getLibraryQueueMetric(summary);
+  const items: Array<{
+    label: string;
+    value: string;
+    detail: string;
+    icon: LucideIcon;
+    progress?: boolean;
+  }> = [
     {
       label: "Rotation",
       value: `${summary.counts.active}/${settings.maxActiveRotationCount}`,
@@ -38,9 +55,10 @@ export function DashboardOverviewStrip({
     },
     {
       label: "Library",
-      value: `${summary.counts.totalGames} / ${summary.queue.total}`,
-      detail: `library / in queue; ${formatMinutes(summary.counts.totalPlaytimeMinutes)} tracked`,
+      value: libraryQueueMetric.value,
+      detail: `${libraryQueueMetric.ratioLabel}; ${formatMinutes(summary.counts.totalPlaytimeMinutes)} tracked`,
       icon: Archive,
+      progress: true,
     },
   ];
   const primaryWarning = summary.warnings[0];
@@ -52,12 +70,13 @@ export function DashboardOverviewStrip({
         {items.map((item) => (
           <div key={item.label} className="flex min-w-0 items-center gap-2 rounded-md bg-muted/35 px-2.5 py-2">
             <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex min-w-0 items-baseline gap-2">
                 <span className="truncate text-xs text-muted-foreground">{item.label}</span>
                 <span className="font-mono text-base font-semibold leading-none">{item.value}</span>
               </div>
               <div className="truncate text-xs text-muted-foreground">{item.detail}</div>
+              {item.progress ? <LibraryQueueProgress summary={summary} className="mt-1.5" /> : null}
             </div>
           </div>
         ))}
