@@ -2,6 +2,8 @@
 
 ## Current Handoff
 
+Active dashboard Steam handoff actions now reflect each game's installed flag: uninstalled games keep Install available while Launch is disabled, and installed games show Installed while Launch is available.
+
 The dashboard Library metric now renders active queue count over total library count, with a compact progress meter that fills as games are removed from the queue.
 
 The Project Continuity System MVP files, self-improvement policy, proposal queue, and local continuity validator are installed.

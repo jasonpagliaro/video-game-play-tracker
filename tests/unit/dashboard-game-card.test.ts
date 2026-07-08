@@ -129,8 +129,21 @@ describe("DashboardGameCard", () => {
     expect(html).toContain("Install");
     expect(html).toContain("Launch");
     expect(html).toContain('href="steam://install/227580"');
+    expect(html).not.toContain('href="steam://run/227580"');
+    expect(html).toContain('aria-label="10,000,000 is not marked installed yet"');
+    expect(html).toContain("disabled");
+  });
+
+  it("renders installed active cards with install disabled and launch enabled", () => {
+    const html = renderToStaticMarkup(
+      createElement(DashboardGameCard, { game: { ...game, installed: true }, variant: "active" }),
+    );
+
+    expect(html).toContain("Installed");
+    expect(html).toContain("Launch");
+    expect(html).toContain('aria-label="10,000,000 is marked installed"');
+    expect(html).not.toContain('href="steam://install/227580"');
     expect(html).toContain('href="steam://run/227580"');
-    expect(html).not.toContain("<button");
   });
 
   it("renders a Steam Deck badge while keeping detailed evidence collapsed", () => {

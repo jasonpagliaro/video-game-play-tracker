@@ -20,6 +20,7 @@ The continuity install is documentation and validation only. It does not change 
 
 ## Recently Completed
 
+- Updated active dashboard Steam handoff actions so the Install and Launch buttons reflect the tracker's installed state.
 - Changed the dashboard Library metric to show active queue count over total library count and added a compact progress meter toward an empty queue.
 - Installed the Project Continuity System MVP file set.
 - Added the controlled self-improvement policy and `PROPOSED_CHANGES.md` queue.

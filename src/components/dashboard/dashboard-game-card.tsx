@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Download, ExternalLink, Play } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Download, ExternalLink, Play } from "lucide-react";
 
 import { CompletionTypeBadge, SlotBadge, StatusBadge } from "@/components/badges/game-badges";
 import { DeckPlayabilityBadge, DeckPlayabilitySummary } from "@/components/dashboard/deck-playability";
@@ -156,7 +156,7 @@ function DashboardActiveActions({
   steamInstallUrl,
   steamLaunchUrl,
 }: {
-  game: Pick<GameSummary, "id" | "title">;
+  game: Pick<GameSummary, "id" | "title" | "installed">;
   steamStoreUrl: string | null;
   steamInstallUrl: string | null;
   steamLaunchUrl: string | null;
@@ -181,18 +181,46 @@ function DashboardActiveActions({
       </div>
       {steamInstallUrl && steamLaunchUrl ? (
         <div className="grid grid-cols-2 gap-1.5">
-          <Button asChild size="sm" variant="outline" className="min-w-0 justify-center gap-1.5 px-2 text-xs">
-            <a href={steamInstallUrl} aria-label={`Install ${game.title} in Steam`}>
-              <Download className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="truncate">Install</span>
-            </a>
-          </Button>
-          <Button asChild size="sm" variant="outline" className="min-w-0 justify-center gap-1.5 px-2 text-xs">
-            <a href={steamLaunchUrl} aria-label={`Launch ${game.title} in Steam`}>
+          {game.installed ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="min-w-0 justify-center gap-1.5 px-2 text-xs"
+              disabled
+              aria-label={`${game.title} is marked installed`}
+            >
+              <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="truncate">Installed</span>
+            </Button>
+          ) : (
+            <Button asChild size="sm" variant="outline" className="min-w-0 justify-center gap-1.5 px-2 text-xs">
+              <a href={steamInstallUrl} aria-label={`Install ${game.title} in Steam`}>
+                <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">Install</span>
+              </a>
+            </Button>
+          )}
+          {game.installed ? (
+            <Button asChild size="sm" variant="outline" className="min-w-0 justify-center gap-1.5 px-2 text-xs">
+              <a href={steamLaunchUrl} aria-label={`Launch ${game.title} in Steam`}>
+                <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="truncate">Launch</span>
+              </a>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="min-w-0 justify-center gap-1.5 px-2 text-xs"
+              disabled
+              aria-label={`${game.title} is not marked installed yet`}
+            >
               <Play className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="truncate">Launch</span>
-            </a>
-          </Button>
+            </Button>
+          )}
         </div>
       ) : null}
     </div>
